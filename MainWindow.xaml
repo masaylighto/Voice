@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:Voice"
         mc:Ignorable="d"
         Title="Voice Lab - Vocal Analyzer &amp; Trainer" 
+        Icon="assets/app_icon.png"
         Height="700" Width="1100"
         MinWidth="950" MinHeight="620"
         WindowStartupLocation="CenterScreen"

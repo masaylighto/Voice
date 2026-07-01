@@ -17,12 +17,18 @@ namespace Voice
                 int filledBlocks = (int)Math.Round(score / 10.0f);
                 filledBlocks = Math.Clamp(filledBlocks, 0, 10);
                 
-                int emptyBlocks = 10 - filledBlocks;
-                
-                return new string('█', filledBlocks) + new string('░', emptyBlocks);
+                var sb = new System.Text.StringBuilder();
+                for (int i = 0; i < 10; i++)
+                {
+                    if (i < filledBlocks)
+                        sb.Append("█ ");
+                    else
+                        sb.Append("░ ");
+                }
+                return sb.ToString().TrimEnd();
             }
             
-            return "░░░░░░░░░░";
+            return "░ ░ ░ ░ ░ ░ ░ ░ ░ ░";
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

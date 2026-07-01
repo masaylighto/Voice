@@ -44,10 +44,10 @@
                     <!-- Visualizer Background Canvas -->
                     <Canvas x:Name="WaveCanvas" Background="#FFFFFF" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <!-- Technical Grid Lines for Spectrogram look -->
-                        <Path x:Name="GridLinesPath" Stroke="#F1F5F9" StrokeThickness="1"/>
+                        <Path x:Name="GridLinesPath" Stroke="#F1F5F9" StrokeThickness="1" Fill="Transparent"/>
                         
                         <!-- Filled Gradient wave under the curve -->
-                        <Polygon x:Name="WavePolygon">
+                        <Polygon x:Name="WavePolygon" Stroke="Transparent" StrokeThickness="0">
                             <Polygon.Fill>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                                     <GradientStop Color="#C7D2FE" Offset="0.0"/>

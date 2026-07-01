@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using NAudio.Dsp;
 
 namespace Voice
 {
@@ -18,6 +19,7 @@ namespace Voice
 
         private string? _currentCategory;
         private int _currentPromptIndex = 0;
+        private float[]? _smoothMagnitudes;
 
         // Event to notify MainWindow that we completed a recording and want to view analysis
         public event Action<VoiceAnalysisSession, string>? AnalysisRequested;
@@ -60,10 +62,10 @@ namespace Voice
                 WavePolyline.Points.Clear();
                 WavePolygon.Points.Clear();
                 
-                // Draw a flat center line when idle
-                double midY = WaveCanvas.ActualHeight / 2;
-                WavePolyline.Points.Add(new Point(0, midY));
-                WavePolyline.Points.Add(new Point(WaveCanvas.ActualWidth, midY));
+                // Draw a flat baseline when idle (at the bottom of the canvas)
+                double baselineY = WaveCanvas.ActualHeight - 2;
+                WavePolyline.Points.Add(new Point(0, baselineY));
+                WavePolyline.Points.Add(new Point(WaveCanvas.ActualWidth, baselineY));
                 
                 // Draw background grid lines
                 DrawGridLines();
@@ -78,13 +80,13 @@ namespace Voice
             double w = WaveCanvas.ActualWidth;
             double h = WaveCanvas.ActualHeight;
             
-            // Horizontal lines
+            // Horizontal grid lines
             for (double y = 30; y < h; y += 30)
             {
                 geometry.Children.Add(new LineGeometry(new Point(0, y), new Point(w, y)));
             }
             
-            // Vertical lines
+            // Vertical grid lines
             for (double x = 45; x < w; x += 45)
             {
                 geometry.Children.Add(new LineGeometry(new Point(x, 0), new Point(x, h)));
@@ -102,33 +104,76 @@ namespace Voice
 
                 double width = WaveCanvas.ActualWidth;
                 double height = WaveCanvas.ActualHeight;
-                double midY = height / 2;
 
                 WavePolyline.Points.Clear();
                 WavePolygon.Points.Clear();
 
+                // Compute FFT on the captured sample buffer
+                int fftLen = 1024;
+                if (samples.Length < fftLen) return;
+
+                var complex = new Complex[fftLen];
+                for (int i = 0; i < fftLen; i++)
+                {
+                    // Apply Hanning Window to prevent spectral leakage
+                    float window = 0.5f * (1.0f - (float)Math.Cos(2.0 * Math.PI * i / (fftLen - 1)));
+                    complex[i].X = samples[i] * window;
+                    complex[i].Y = 0f;
+                }
+
+                int m = (int)Math.Log2(fftLen);
+                FastFourierTransform.FFT(true, m, complex);
+
+                // We display the vocal speech band (DC to ~3500 Hz)
+                // At 44.1kHz sample rate, bin spacing is 44100 / 1024 = 43.07 Hz.
+                // 3500 Hz corresponds to bin index: 3500 / 43.07 = 81.
+                int startBin = 2; // skip DC and low sub-bass rumble
+                int endBin = 85;  // covers up to ~3660 Hz
+                int numBins = endBin - startBin;
+
+                float[] magnitudes = new float[numBins];
+                for (int i = 0; i < numBins; i++)
+                {
+                    var c = complex[i + startBin];
+                    magnitudes[i] = (float)Math.Sqrt(c.X * c.X + c.Y * c.Y);
+                }
+
+                // Initialize smoothing buffer if needed
+                if (_smoothMagnitudes == null || _smoothMagnitudes.Length != numBins)
+                {
+                    _smoothMagnitudes = new float[numBins];
+                }
+
+                // Apply exponential smoothing (rise fast, decay slow) to make the bars smooth and fluid
+                for (int i = 0; i < numBins; i++)
+                {
+                    float target = magnitudes[i];
+                    if (target > _smoothMagnitudes[i])
+                        _smoothMagnitudes[i] = 0.4f * _smoothMagnitudes[i] + 0.6f * target;
+                    else
+                        _smoothMagnitudes[i] = 0.75f * _smoothMagnitudes[i] + 0.25f * target;
+                }
+
                 // Start polygon path at the bottom left corner
                 WavePolygon.Points.Add(new Point(0, height));
 
-                // Downsample for visual clarity and performance (draw ~300 points max)
-                int step = Math.Max(1, samples.Length / 300);
-                double xStep = width / (samples.Length / (double)step);
-
-                int drawIndex = 0;
+                double xStep = width / (numBins - 1);
                 double lastX = 0;
-                for (int i = 0; i < samples.Length; i += step)
+
+                for (int i = 0; i < numBins; i++)
                 {
-                    double x = drawIndex * xStep;
-                    // Scale amplitude: multiply by height/2, amplify slightly for visual impact
-                    double y = midY + (samples[i] * midY * 1.6);
-                    y = Math.Clamp(y, 2, height - 2); // keep within bounds
+                    double x = i * xStep;
+                    
+                    // Convert magnitude to vertical pixel height
+                    // We apply a square-root scaling for better visualization of quiet signals
+                    double y = height - (Math.Sqrt(_smoothMagnitudes[i]) * height * 1.8);
+                    y = Math.Clamp(y, 4, height - 2); // keep within visual range
 
                     var p = new Point(x, y);
                     WavePolyline.Points.Add(p);
                     WavePolygon.Points.Add(p);
-                    
+
                     lastX = x;
-                    drawIndex++;
                 }
 
                 // Close polygon path at the bottom right corner

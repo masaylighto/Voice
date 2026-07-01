@@ -86,11 +86,9 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="Pitch" FontFamily="Calibri" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
                                 <TextBlock x:Name="PitchRawText" Grid.Column="1" Text="120 Hz" FontFamily="Calibri" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,1,0,0"/>
-                                <TextBlock x:Name="PitchAsciiBar" Grid.Column="2" Text="████████░░" FontFamily="Consolas" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
                             </Grid>
                             <Slider x:Name="PitchGauge" Style="{StaticResource GaugeSliderStyle}" Value="30"/>
                             <Grid Margin="0,-4,0,0">
@@ -106,11 +104,9 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="Resonance" FontFamily="Calibri" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
                                 <TextBlock x:Name="ResRawText" Grid.Column="1" Text="1200 Hz" FontFamily="Calibri" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,1,0,0"/>
-                                <TextBlock x:Name="ResAsciiBar" Grid.Column="2" Text="██████████" FontFamily="Consolas" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
                             </Grid>
                             <Slider x:Name="ResGauge" Style="{StaticResource GaugeSliderStyle}" Value="50"/>
                             <Grid Margin="0,-4,0,0">
@@ -126,11 +122,9 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="Weight" FontFamily="Calibri" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
                                 <TextBlock x:Name="WeightRawText" Grid.Column="1" Text="+4.5 dB" FontFamily="Calibri" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,1,0,0"/>
-                                <TextBlock x:Name="WeightAsciiBar" Grid.Column="2" Text="███████░░░" FontFamily="Consolas" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
                             </Grid>
                             <Slider x:Name="WeightGauge" Style="{StaticResource GaugeSliderStyle}" Value="40"/>
                             <Grid Margin="0,-4,0,0">
@@ -146,11 +140,9 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="Intonation" FontFamily="Calibri" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
                                 <TextBlock x:Name="IntRawText" Grid.Column="1" Text="1.8 st" FontFamily="Calibri" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,1,0,0"/>
-                                <TextBlock x:Name="IntAsciiBar" Grid.Column="2" Text="████████░░" FontFamily="Consolas" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
                             </Grid>
                             <Slider x:Name="IntGauge" Style="{StaticResource GaugeSliderStyle}" Value="60"/>
                             <Grid Margin="0,-4,0,0">
@@ -166,11 +158,9 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="Speech Patterns" FontFamily="Calibri" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
                                 <TextBlock x:Name="PatternRawText" Grid.Column="1" Text="3.2 syl/s, falling" FontFamily="Calibri" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,1,0,0"/>
-                                <TextBlock x:Name="PatternAsciiBar" Grid.Column="2" Text="█████████░" FontFamily="Consolas" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
                             </Grid>
                             <Slider x:Name="PatternGauge" Style="{StaticResource GaugeSliderStyle}" Value="80"/>
                             <Grid Margin="0,-4,0,0">

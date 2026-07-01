@@ -29,13 +29,6 @@ namespace Voice
             WeightGauge.Value = session.WeightScore;
             IntGauge.Value = session.IntonationScore;
             PatternGauge.Value = session.SpeechPatternsScore;
-
-            // Set the ASCII progress bars exactly matching the requested look
-            PitchAsciiBar.Text = GetAsciiBar(session.PitchScore);
-            ResAsciiBar.Text = GetAsciiBar(session.ResonanceScore);
-            WeightAsciiBar.Text = GetAsciiBar(session.WeightScore);
-            IntAsciiBar.Text = GetAsciiBar(session.IntonationScore);
-            PatternAsciiBar.Text = GetAsciiBar(session.SpeechPatternsScore);
         }
 
         public void DisplayRecord(VoiceSessionRecord record)
@@ -54,28 +47,6 @@ namespace Voice
             WeightGauge.Value = record.WeightScore;
             IntGauge.Value = record.IntonationScore;
             PatternGauge.Value = record.SpeechPatternsScore;
-
-            PitchAsciiBar.Text = GetAsciiBar(record.PitchScore);
-            ResAsciiBar.Text = GetAsciiBar(record.ResonanceScore);
-            WeightAsciiBar.Text = GetAsciiBar(record.WeightScore);
-            IntAsciiBar.Text = GetAsciiBar(record.IntonationScore);
-            PatternAsciiBar.Text = GetAsciiBar(record.SpeechPatternsScore);
-        }
-
-        private string GetAsciiBar(float score)
-        {
-            int filled = (int)Math.Round(score / 10.0f);
-            filled = Math.Clamp(filled, 0, 10);
-            
-            var sb = new System.Text.StringBuilder();
-            for (int i = 0; i < 10; i++)
-            {
-                if (i < filled)
-                    sb.Append("█ ");
-                else
-                    sb.Append("░ ");
-            }
-            return sb.ToString().TrimEnd();
         }
     }
 }
