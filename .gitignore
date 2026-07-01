@@ -1,0 +1,11 @@
+# .gitignore for .NET C# WPF
+[Bb]in/
+[Oo]bj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs
+*.log
