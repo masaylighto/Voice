@@ -28,6 +28,23 @@ namespace Voice
                 }
             }
 
+            bool buildIcon = false;
+            foreach (var arg in e.Args)
+            {
+                if (arg.Equals("--build-icon", StringComparison.OrdinalIgnoreCase))
+                {
+                    buildIcon = true;
+                    break;
+                }
+            }
+
+            if (buildIcon)
+            {
+                BuildAppIcon();
+                Shutdown();
+                return;
+            }
+
             if (runDspTests)
             {
                 RunDiagnosticTests(headless);
@@ -155,6 +172,67 @@ namespace Voice
                 samples[i] = 0.5f * (float)Math.Sin(2.0 * Math.PI * frequency * i / sampleRate);
             }
             return samples;
+        }
+
+        private void BuildAppIcon()
+        {
+            try
+            {
+                string pngPath = @"d:\Coding\Voice\assets\app_icon.png";
+                string outPngPath = @"d:\Coding\Voice\assets\app_icon_256.png";
+                string icoPath = @"d:\Coding\Voice\assets\app_icon.ico";
+
+                if (!System.IO.File.Exists(pngPath))
+                {
+                    Console.WriteLine("PNG file not found: " + pngPath);
+                    return;
+                }
+
+                // Load PNG using WPF tools with OnLoad caching to prevent file locking
+                var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                bitmap.BeginInit();
+                bitmap.UriSource = new Uri(pngPath);
+                bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                bitmap.EndInit();
+
+                // Resize to 256x256
+                var scale = new System.Windows.Media.ScaleTransform(256.0 / bitmap.PixelWidth, 256.0 / bitmap.PixelHeight);
+                var resized = new System.Windows.Media.Imaging.TransformedBitmap(bitmap, scale);
+
+                // Save resized PNG
+                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(resized));
+                using (var fs = System.IO.File.OpenWrite(outPngPath))
+                {
+                    encoder.Save(fs);
+                }
+
+                // Read bytes of resized PNG
+                byte[] pngBytes = System.IO.File.ReadAllBytes(outPngPath);
+                int pngSize = pngBytes.Length;
+
+                // Write ICO file
+                using (var fs = System.IO.File.Create(icoPath))
+                {
+                    // ICO Header
+                    fs.Write(new byte[] { 0, 0, 1, 0, 1, 0 }, 0, 6);
+                    // Directory Entry
+                    fs.Write(new byte[] { 0, 0, 0, 0, 1, 0, 32, 0 }, 0, 8); // Width=0, Height=0, Colors=0, Reserved=0, Planes=1, BPP=32
+                    fs.Write(BitConverter.GetBytes((uint)pngSize), 0, 4);   // Size
+                    fs.Write(BitConverter.GetBytes((uint)22), 0, 4);        // Offset (22)
+                    // PNG Data
+                    fs.Write(pngBytes, 0, pngSize);
+                }
+
+                // Overwrite original png with the 256x256 one
+                System.IO.File.Delete(pngPath);
+                System.IO.File.Move(outPngPath, pngPath);
+                Console.WriteLine("Icon generated successfully!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error building icon: " + ex.Message);
+            }
         }
     }
 }
