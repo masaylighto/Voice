@@ -97,7 +97,15 @@ namespace Voice
                 return;
             }
 
-            MessageBox.Show(rawReport, "Raw Vocal Data (Unprocessed)", MessageBoxButton.OK, MessageBoxImage.Information);
+            try
+            {
+                Clipboard.SetText(rawReport);
+                MessageBox.Show("Raw vocal metrics copied to clipboard successfully!", "Copied to Clipboard", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to copy to clipboard: {ex.Message}\n\nHere is the data:\n{rawReport}", "Raw Vocal Diagnostics", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private string ConstructRawReport(float pitch, float resonance, float weight, float intonation, float rate, float pause, string classification, bool? ending = null)
