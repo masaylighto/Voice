@@ -93,8 +93,8 @@ namespace Voice
                 double variance = semitones.Sum(s => Math.Pow(s - avgSemitone, 2)) / semitones.Count;
                 PitchStdDevSemitones = (float)Math.Sqrt(variance);
 
-                // Map standard deviation: 1.0 semitone (Monotonic / Masculine) to 3.5 semitones (Melodic / Feminine)
-                IntonationScore = Math.Clamp((PitchStdDevSemitones - 1.0f) / 2.5f * 100.0f, 0f, 100f);
+                // Map standard deviation: 1.0 semitone (Monotonic / Masculine) to 4.5 semitones (Melodic / Feminine)
+                IntonationScore = Math.Clamp((PitchStdDevSemitones - 1.0f) / 3.5f * 100.0f, 0f, 100f);
             }
             else
             {

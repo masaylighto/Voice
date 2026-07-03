@@ -97,7 +97,7 @@ namespace Voice
 
             float centroid = sumMag > 1e-6f ? (sumFreqMag / sumMag) : 1200f; // default to neutral if empty
 
-            // 5. Calculate Vocal Weight (Energy in low band 80-250Hz vs mid-high band 250-3000Hz)
+            // 5. Calculate Vocal Weight (Normalized average energy density in low band 80-250Hz vs mid-high band 250-3000Hz)
             float energyLow = 0;
             float energyMidHigh = 0;
 
@@ -111,29 +111,39 @@ namespace Voice
             midHighBandMinBin = Math.Clamp(midHighBandMinBin, 0, numBins - 1);
             midHighBandMaxBin = Math.Clamp(midHighBandMaxBin, 0, numBins - 1);
 
+            int lowBinsCount = 0;
             for (int i = lowBandMinBin; i <= lowBandMaxBin; i++)
             {
                 energyLow += magnitudes[i] * magnitudes[i];
+                lowBinsCount++;
             }
 
+            int midHighBinsCount = 0;
             for (int i = midHighBandMinBin; i <= midHighBandMaxBin; i++)
             {
                 energyMidHigh += magnitudes[i] * magnitudes[i];
+                midHighBinsCount++;
             }
 
-            // Express as a ratio in decibels
+            // Express as a ratio of average power spectral density in decibels
             float weightDb = 0;
-            if (energyLow > 1e-10f && energyMidHigh > 1e-10f)
+            if (lowBinsCount > 0 && midHighBinsCount > 0)
             {
-                weightDb = 10f * (float)Math.Log10(energyLow / energyMidHigh);
-            }
-            else if (energyLow > 1e-10f)
-            {
-                weightDb = 15f; // high weight
-            }
-            else
-            {
-                weightDb = -15f; // low weight
+                float avgEnergyLow = energyLow / lowBinsCount;
+                float avgEnergyMidHigh = energyMidHigh / midHighBinsCount;
+
+                if (avgEnergyLow > 1e-10f && avgEnergyMidHigh > 1e-10f)
+                {
+                    weightDb = 10f * (float)Math.Log10(avgEnergyLow / avgEnergyMidHigh);
+                }
+                else if (avgEnergyLow > 1e-10f)
+                {
+                    weightDb = 15f; // high weight
+                }
+                else
+                {
+                    weightDb = -15f; // low weight
+                }
             }
 
             return new FrameMetrics
@@ -187,6 +197,9 @@ namespace Voice
 
             if (r0 < 1e-7f) return 0;
 
+            // Average power at lag 0 (normalized by window length)
+            float avgPower0 = r0 / FftLength;
+
             // Compute autocorrelation for lags in target range
             for (int lag = minLag; lag <= maxLag; lag++)
             {
@@ -196,7 +209,8 @@ namespace Voice
                 {
                     sum += clipped[i] * clipped[i + lag];
                 }
-                r[lag] = sum;
+                // Normalize by the actual number of overlapping samples to eliminate lag bias
+                r[lag] = sum / maxIdx;
             }
 
             // Find the highest peak in the search range
@@ -226,7 +240,7 @@ namespace Voice
             }
 
             // Verify peak confidence (autocorrelation coefficient threshold, typically > 0.25)
-            float threshold = 0.25f * r0;
+            float threshold = 0.25f * avgPower0;
             if (peakLag == -1 || maxR < threshold)
             {
                 return 0; // Unvoiced / too weak

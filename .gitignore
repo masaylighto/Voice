@@ -9,3 +9,6 @@
 
 # Logs
 *.log
+
+# Publish output
+publish/
