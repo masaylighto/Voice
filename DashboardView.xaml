@@ -204,6 +204,12 @@
 
                 <!-- Right Column: Navigation Actions -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button x:Name="OpenRecordingsBtn" 
+                            Content="Open Recordings Folder" 
+                            Style="{StaticResource PrimaryButton}" 
+                            Background="#4B5563"
+                            Margin="0,0,10,0"
+                            Click="OpenRecordingsBtn_Click"/>
                     <Button x:Name="AnalyzeBtn" 
                             Content="Analyze Recording →" 
                             Style="{StaticResource PrimaryButton}" 

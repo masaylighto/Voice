@@ -357,5 +357,30 @@ namespace Voice
                 }
             }
         }
+
+        private void OpenRecordingsBtn_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                string recordingsDir = System.IO.Path.Combine(appData, "VoiceTester", "Recordings");
+                if (!System.IO.Directory.Exists(recordingsDir))
+                {
+                    System.IO.Directory.CreateDirectory(recordingsDir);
+                }
+                
+                System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"\"{recordingsDir}\"",
+                    UseShellExecute = true
+                };
+                System.Diagnostics.Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Could not open recordings directory: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
     }
 }

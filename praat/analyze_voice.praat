@@ -150,21 +150,58 @@ if total_duration > 0
     pause_ratio = silent_duration / total_duration
 endif
 
-# Articulation peak counter (simplified syllables estimate)
-selectObject: intensity
+# Articulation peak counter (robust syllable nuclei detection)
+selectObject: sound
+Filter (pass Hann band): 300, 3000, 100
+sound_filt = selected("Sound")
+intensity_filt = To Intensity: 50, 0.01, "yes"
+
+selectObject: intensity_filt
 num_frames = Get number of frames
 syllables_count = 0
-for f from 2 to num_frames - 1
+last_peak_time = -1.0
+min_peak_distance = 0.15 ; # Min 150ms between vowels (~6.6 syllables/sec max)
+
+# Dynamic threshold based on maximum intensity
+max_intensity = Get maximum: 0, 0, "Parabolic"
+threshold = max_intensity - 18.0
+if threshold < 40.0
+    threshold = 40.0
+endif
+
+for f from 3 to num_frames - 2
+    t = Get time from frame number: f
     val = Get value in frame: f
     val_prev = Get value in frame: f - 1
+    val_prev2 = Get value in frame: f - 2
     val_next = Get value in frame: f + 1
-    if val > silence_threshold and val > val_prev and val > val_next
-        # Ensure it is a significant peak
-        if val > 35.0
-            syllables_count = syllables_count + 1
+    val_next2 = Get value in frame: f + 2
+    
+    if val != undefined and val_prev != undefined and val_next != undefined
+        if val > val_prev and val > val_next and val > val_prev2 and val > val_next2
+            if val > threshold
+                # Check minimum separation between syllable peaks
+                if t - last_peak_time > min_peak_distance
+                    # Validate that it has corresponding voicing (pitch > 0)
+                    selectObject: pitch
+                    p_val = Get value at time: t, "Hertz", "Linear"
+                    selectObject: intensity_filt
+                    
+                    if p_val != undefined and p_val > 0
+                        syllables_count = syllables_count + 1
+                        last_peak_time = t
+                    endif
+                endif
+            endif
         endif
     endif
 endfor
+
+# Clean up temp objects
+selectObject: intensity_filt
+Remove
+selectObject: sound_filt
+Remove
 
 articulation_rate = 0
 speaking_rate = 0
