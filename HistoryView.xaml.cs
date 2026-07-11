@@ -53,9 +53,21 @@ namespace Voice
 
         private void PlayRecord_Click(object sender, RoutedEventArgs e)
         {
-            if (_audioEngine == null || _activePlayButton != null) return;
-
             var button = (Button)sender;
+
+            if (_activePlayButton == button)
+            {
+                _audioEngine?.StopPlayback();
+                return;
+            }
+
+            if (_audioEngine == null) return;
+
+            if (_activePlayButton != null)
+            {
+                _audioEngine.StopPlayback();
+            }
+
             if (button.DataContext is VoiceSessionRecord record)
             {
                 if (string.IsNullOrEmpty(record.AudioPath) || !System.IO.File.Exists(record.AudioPath))
@@ -65,21 +77,37 @@ namespace Voice
                 }
 
                 _activePlayButton = button;
-                _activePlayButton.IsEnabled = false;
-                SetButtonText(_activePlayButton, "Playing...");
+                SetButtonText(_activePlayButton, "Stop");
+                SetPlayButtonIcon(_activePlayButton, "\uE71A");
 
+                var playingButton = _activePlayButton;
                 _audioEngine.PlaybackRecording(record.AudioPath, null, () =>
                 {
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        if (_activePlayButton != null)
+                        if (_activePlayButton == playingButton)
                         {
-                            _activePlayButton.IsEnabled = true;
-                            SetButtonText(_activePlayButton, "Play");
+                            SetButtonText(playingButton, "Play");
+                            SetPlayButtonIcon(playingButton, "\uE768");
                             _activePlayButton = null;
                         }
                     }));
                 });
+            }
+        }
+
+        private void SetPlayButtonIcon(Button button, string glyph)
+        {
+            if (button.Content is StackPanel sp)
+            {
+                foreach (var child in sp.Children)
+                {
+                    if (child is TextBlock tb && tb.FontFamily.Source == "Segoe MDL2 Assets")
+                    {
+                        tb.Text = glyph;
+                        break;
+                    }
+                }
             }
         }
 

@@ -259,11 +259,17 @@ namespace Voice
 
         private void PlayButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_audioEngine == null || string.IsNullOrEmpty(_lastWavPath) || _isPlayingBack) return;
+            if (_audioEngine == null || string.IsNullOrEmpty(_lastWavPath)) return;
+
+            if (_isPlayingBack)
+            {
+                _audioEngine.StopPlayback();
+                return;
+            }
 
             _isPlayingBack = true;
-            PlayButton.IsEnabled = false;
-            SetButtonText(PlayButton, "Playing...");
+            SetButtonText(PlayButton, "Stop");
+            SetPlayButtonIcon("&#xE71A;");
             
             // Visual feedback on visualizer overlay during playback
             VisualizerOverlayText.Text = "Playing audio sample...";
@@ -274,12 +280,27 @@ namespace Voice
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     _isPlayingBack = false;
-                    PlayButton.IsEnabled = true;
                     SetButtonText(PlayButton, "Playback");
+                    SetPlayButtonIcon("&#xE768;");
                     VisualizerOverlayText.Text = "Analysis Ready";
                     VisualizerOverlaySubtext.Text = "Recording successfully captured. Click Analyze to view details.";
                 }));
             });
+        }
+
+        private void SetPlayButtonIcon(string glyph)
+        {
+            if (PlayButton.Content is StackPanel sp)
+            {
+                foreach (var child in sp.Children)
+                {
+                    if (child is TextBlock tb && tb.FontFamily.Source == "Segoe MDL2 Assets")
+                    {
+                        tb.Text = glyph == "&#xE768;" ? "\uE768" : "\uE71A";
+                        break;
+                    }
+                }
+            }
         }
 
         private void AnalyzeBtn_Click(object sender, RoutedEventArgs e)

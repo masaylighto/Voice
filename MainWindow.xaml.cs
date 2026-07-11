@@ -57,6 +57,9 @@ namespace Voice
             AnalysisPanel.Visibility = Visibility.Collapsed;
             HistoryPanel.Visibility = Visibility.Collapsed;
 
+            // Stop any active audio playbacks when navigating between tabs
+            _audioEngine?.StopPlayback();
+
             // Show selected view
             if (NavCapture.IsChecked == true)
             {

@@ -170,8 +170,16 @@
                                FontFamily="Calibri" 
                                FontSize="12" 
                                Foreground="{StaticResource TextSecondaryBrush}" 
-                               Margin="0,2,0,0"
+                               Margin="0,2,0,8"
                                TextWrapping="Wrap"/>
+                    <Button x:Name="OpenRecordingsBtn" 
+                            Content="Open Recordings Folder" 
+                            Style="{StaticResource PrimaryButton}" 
+                            Background="#4B5563"
+                            HorizontalAlignment="Left"
+                            Padding="12,6"
+                            FontSize="11"
+                            Click="OpenRecordingsBtn_Click"/>
                 </StackPanel>
 
                 <!-- Center Column: Recording Controls -->
@@ -204,12 +212,6 @@
 
                 <!-- Right Column: Navigation Actions -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <Button x:Name="OpenRecordingsBtn" 
-                            Content="Open Recordings Folder" 
-                            Style="{StaticResource PrimaryButton}" 
-                            Background="#4B5563"
-                            Margin="0,0,10,0"
-                            Click="OpenRecordingsBtn_Click"/>
                     <Button x:Name="AnalyzeBtn" 
                             Content="Analyze Recording →" 
                             Style="{StaticResource PrimaryButton}" 

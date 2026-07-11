@@ -12,6 +12,8 @@ namespace Voice
         private string? _tempWavPath;
         private readonly VoiceAnalysisSession _currentSession = new VoiceAnalysisSession();
         private bool _isRecording;
+        private WaveOutEvent? _activeOutputDevice;
+        private AudioFileReader? _activeWaveReader;
 
         // Callbacks
         public event Action<float>? VolumeCaptured;
@@ -139,27 +141,48 @@ namespace Voice
 
             try
             {
-                var waveReader = new AudioFileReader(wavPath);
-                var outputDevice = new WaveOutEvent();
-                outputDevice.Init(waveReader);
+                // Stop any current playback first
+                StopPlayback();
 
-                // Setup timer or event to push samples for visualization during playback
-                var sampleProvider = waveReader.ToSampleProvider();
-                
-                // Let's wrap standard playback but we want simple playback for history.
-                // A simple WaveOut playback is enough:
-                outputDevice.PlaybackStopped += (s, e) =>
+                _activeWaveReader = new AudioFileReader(wavPath);
+                _activeOutputDevice = new WaveOutEvent();
+
+                var readerRef = _activeWaveReader;
+                var deviceRef = _activeOutputDevice;
+
+                deviceRef.Init(readerRef);
+
+                deviceRef.PlaybackStopped += (s, e) =>
                 {
-                    outputDevice.Dispose();
-                    waveReader.Dispose();
+                    deviceRef.Dispose();
+                    readerRef.Dispose();
+
+                    if (_activeOutputDevice == deviceRef) _activeOutputDevice = null;
+                    if (_activeWaveReader == readerRef) _activeWaveReader = null;
+
                     playbackFinishedCallback?.Invoke();
                 };
 
-                outputDevice.Play();
+                deviceRef.Play();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error playing back WAV: {ex.Message}");
+            }
+        }
+
+        public void StopPlayback()
+        {
+            try
+            {
+                if (_activeOutputDevice != null)
+                {
+                    _activeOutputDevice.Stop();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error stopping playback: {ex.Message}");
             }
         }
 
