@@ -18,8 +18,8 @@ namespace Voice
 
         private string? _currentCategory;
         private int _currentPromptIndex = 0;
-        private readonly Queue<float> _livePitchHistory = new Queue<float>();
-        private const int MaxLivePitchPoints = 240;
+        private readonly Queue<float> _liveVolumeHistory = new Queue<float>();
+        private const int MaxLiveVolumePoints = 240;
 
         // Event to notify MainWindow that we completed a recording and want to view analysis
         public event Action<VoiceAnalysisSession, string>? AnalysisRequested;
@@ -50,7 +50,7 @@ namespace Voice
         public void SetAudioEngine(AudioEngine audioEngine)
         {
             _audioEngine = audioEngine;
-            _audioEngine.LiveFrameProcessed += AudioEngine_LiveFrameProcessed;
+            _audioEngine.VolumeCaptured += AudioEngine_VolumeCaptured;
             _audioEngine.RecordingFinished += AudioEngine_RecordingFinished;
         }
 
@@ -106,32 +106,26 @@ namespace Voice
 
         private void DrawLivePitchContour()
         {
-            if (WaveCanvas.ActualWidth <= 0 || WaveCanvas.ActualHeight <= 0)
-            {
-                return;
-            }
-
-            const float minPitch = 65f;
-            const float maxPitch = 300f;
             double width = WaveCanvas.ActualWidth;
-            double chartHeight = Math.Max(1, WaveCanvas.ActualHeight - 42);
-            float[] values = _livePitchHistory.ToArray();
-            int offset = MaxLivePitchPoints - values.Length;
-            double xStep = width / (MaxLivePitchPoints - 1d);
+            double chartHeight = WaveCanvas.ActualHeight;
+
+            if (width <= 0 || chartHeight <= 0) return;
+
+            float[] values = _liveVolumeHistory.ToArray();
+            int offset = MaxLiveVolumePoints - values.Length;
+
+            double xStep = width / (MaxLiveVolumePoints - 1d);
             PathGeometry path = new PathGeometry();
             PathFigure? currentFigure = null;
 
             for (int i = 0; i < values.Length; i++)
             {
-                if (values[i] <= 0)
-                {
-                    currentFigure = null;
-                    continue;
-                }
-
                 double x = (i + offset) * xStep;
-                double y = Math.Clamp((maxPitch - values[i]) / (maxPitch - minPitch) * chartHeight, 0, chartHeight);
+                // Scale RMS volume (0.0 to 1.0) so typical speech (0.01 to 0.3) is bouncy and clear
+                double volumeRatio = Math.Clamp(values[i] * 4.0, 0.0, 1.0);
+                double y = chartHeight - (volumeRatio * chartHeight * 0.8) - (chartHeight * 0.1);
                 Point point = new Point(x, y);
+
                 if (currentFigure == null)
                 {
                     currentFigure = new PathFigure { StartPoint = point, IsClosed = false, IsFilled = false };
@@ -146,30 +140,25 @@ namespace Voice
             LivePitchPath.Data = path;
         }
 
-        private void AudioEngine_LiveFrameProcessed(FrameMetrics metrics)
+        private void AudioEngine_VolumeCaptured(float rmsVolume)
         {
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                _livePitchHistory.Enqueue(metrics.IsVoiced ? metrics.Pitch : 0f);
-                if (_livePitchHistory.Count > MaxLivePitchPoints)
+                _liveVolumeHistory.Enqueue(rmsVolume);
+                if (_liveVolumeHistory.Count > MaxLiveVolumePoints)
                 {
-                    _livePitchHistory.Dequeue();
+                    _liveVolumeHistory.Dequeue();
                 }
                 DrawLivePitchContour();
 
-                if (metrics.IsVoiced)
+                if (rmsVolume > 0.015f)
                 {
-                    LivePitchText.Text = $"{Math.Round(metrics.Pitch)} Hz";
-                    if (metrics.Pitch < 130f)
-                        LivePitchText.Foreground = (SolidColorBrush)Application.Current.Resources["MaleBrush"];
-                    else if (metrics.Pitch < 180f)
-                        LivePitchText.Foreground = (SolidColorBrush)Application.Current.Resources["AndroBrush"];
-                    else
-                        LivePitchText.Foreground = (SolidColorBrush)Application.Current.Resources["FemaleBrush"];
+                    LivePitchText.Text = "Capturing Voice...";
+                    LivePitchText.Foreground = (SolidColorBrush)Application.Current.Resources["FemaleBrush"];
                 }
                 else
                 {
-                    LivePitchText.Text = "--- Hz";
+                    LivePitchText.Text = "Listening...";
                     LivePitchText.Foreground = (SolidColorBrush)Application.Current.Resources["TextSecondaryBrush"];
                 }
             }));
@@ -188,15 +177,32 @@ namespace Voice
                 RecordBtnText.Foreground = Brushes.White;
                 RecordBtn.Background = new SolidColorBrush(Color.FromRgb(239, 68, 68)); // red
 
-                VisualizerOverlayText.Text = "Analysis Ready";
-                VisualizerOverlaySubtext.Text = "Recording successfully captured. Click Analyze to view details.";
-                VisualizerOverlay.Visibility = Visibility.Visible;
+                if (!string.IsNullOrEmpty(session.AnalysisError))
+                {
+                    VisualizerOverlayText.Text = "Praat Error";
+                    VisualizerOverlaySubtext.Text = "Praat is required for analysis.";
+                    StatusTitle.Text = "Praat Missing";
+                    StatusSubtitle.Text = "Please run the installer script to configure Praat.";
 
-                StatusTitle.Text = "Vocal capture complete";
-                StatusSubtitle.Text = "You can listen back to your recording or proceed to full analysis.";
+                    PlayButton.Visibility = Visibility.Collapsed;
+                    AnalyzeBtn.IsEnabled = false;
 
-                PlayButton.Visibility = Visibility.Visible;
-                AnalyzeBtn.IsEnabled = true;
+                    MessageBox.Show(
+                        session.AnalysisError, 
+                        "Praat Required", 
+                        MessageBoxButton.OK, 
+                        MessageBoxImage.Error);
+                }
+                else
+                {
+                    VisualizerOverlayText.Text = "Analysis Ready";
+                    VisualizerOverlaySubtext.Text = "Recording successfully captured. Click Analyze to view details.";
+                    StatusTitle.Text = "Vocal capture complete";
+                    StatusSubtitle.Text = "You can listen back to your recording or proceed to full analysis.";
+
+                    PlayButton.Visibility = Visibility.Visible;
+                    AnalyzeBtn.IsEnabled = true;
+                }
 
                 DrawLivePitchContour();
             }));
@@ -221,9 +227,9 @@ namespace Voice
                     
                     _recordingStartTime = DateTime.Now;
                     LiveTimerText.Text = "0.0s";
-                    LivePitchText.Text = "--- Hz";
+                    LivePitchText.Text = "Listening...";
                     LivePitchText.Foreground = (SolidColorBrush)Application.Current.Resources["AccentBrush"];
-                    _livePitchHistory.Clear();
+                    _liveVolumeHistory.Clear();
                     ResetVisualizer();
                     _recordingTimer?.Start();
 

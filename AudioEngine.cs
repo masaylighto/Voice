@@ -10,13 +10,11 @@ namespace Voice
         private WaveInEvent? _waveIn;
         private WaveFileWriter? _waveWriter;
         private string? _tempWavPath;
-        private readonly List<float> _sampleBuffer = new List<float>();
         private readonly VoiceAnalysisSession _currentSession = new VoiceAnalysisSession();
         private bool _isRecording;
-        private long _processedFrameCount;
 
         // Callbacks
-        public event Action<FrameMetrics>? LiveFrameProcessed;
+        public event Action<float>? VolumeCaptured;
         public event Action<VoiceAnalysisSession>? RecordingFinished;
 
         public bool IsRecording => _isRecording;
@@ -26,10 +24,6 @@ namespace Voice
         {
             if (_isRecording) return;
 
-            _sampleBuffer.Clear();
-            _currentSession.Frames.Clear();
-            _processedFrameCount = 0;
-            
             // Set up temp WAV file path
             _tempWavPath = Path.Combine(Path.GetTempPath(), $"voice_test_{Guid.NewGuid()}.wav");
             
@@ -88,40 +82,24 @@ namespace Voice
                 newSamples[i] = sample / 32768.0f;
             }
 
-            // Append to sliding buffer for DSP analysis
-            _sampleBuffer.AddRange(newSamples);
-
-            // Process 46 ms frames with a 23 ms hop so the contour has a useful time resolution.
-            int frameSize = DspProcessor.AnalysisFrameSize;
-            int hopSize = DspProcessor.AnalysisHopSize;
-
-            while (_sampleBuffer.Count >= frameSize)
+            // Calculate RMS volume of the current capture buffer
+            float sum = 0f;
+            foreach (var s in newSamples)
             {
-                float[] frame = new float[frameSize];
-                _sampleBuffer.CopyTo(0, frame, 0, frameSize);
-
-                // Run DSP processing on the frame
-                FrameMetrics metrics = DspProcessor.ProcessFrame(frame, 44100);
-                metrics.TimeSeconds = _processedFrameCount * hopSize / 44100f;
-                _processedFrameCount++;
-
-                // Accumulate in current session
-                _currentSession.AddFrame(metrics);
-
-                // Trigger live UI callback
-                LiveFrameProcessed?.Invoke(metrics);
-
-                // Remove hopSize samples from buffer to slide the window
-                _sampleBuffer.RemoveRange(0, hopSize);
+                sum += s * s;
             }
+            float rms = (float)Math.Sqrt(sum / newSamples.Length);
+
+            // Trigger live UI callback with the RMS volume (for the waveform visualizer)
+            VolumeCaptured?.Invoke(rms);
         }
 
         private void OnRecordingStopped(object? sender, StoppedEventArgs e)
         {
             CleanupRecording();
 
-            // Calculate aggregated session results
-            _currentSession.CalculateResults();
+            // Calculate aggregated session results (passing WAV path for Praat analysis)
+            _currentSession.CalculateResults(_tempWavPath);
             
             // Notify subscribers
             RecordingFinished?.Invoke(_currentSession);

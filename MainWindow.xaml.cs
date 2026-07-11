@@ -16,7 +16,6 @@ namespace Voice
 
             // 2. Pass AudioEngine references to each view page
             DashboardPanel.SetAudioEngine(_audioEngine);
-            TrainerPanel.SetAudioEngine(_audioEngine);
             HistoryPanel.SetAudioEngine(_audioEngine);
 
             // 3. Connect cross-view request events
@@ -48,7 +47,7 @@ namespace Voice
         private void Nav_Checked(object sender, RoutedEventArgs e)
         {
             // Ensure views are loaded
-            if (DashboardPanel == null || AnalysisPanel == null || TrainerPanel == null || HistoryPanel == null)
+            if (DashboardPanel == null || AnalysisPanel == null || HistoryPanel == null)
             {
                 return;
             }
@@ -56,7 +55,6 @@ namespace Voice
             // Hide all views first
             DashboardPanel.Visibility = Visibility.Collapsed;
             AnalysisPanel.Visibility = Visibility.Collapsed;
-            TrainerPanel.Visibility = Visibility.Collapsed;
             HistoryPanel.Visibility = Visibility.Collapsed;
 
             // Show selected view
@@ -68,10 +66,7 @@ namespace Voice
             {
                 AnalysisPanel.Visibility = Visibility.Visible;
             }
-            else if (NavTrainer.IsChecked == true)
-            {
-                TrainerPanel.Visibility = Visibility.Visible;
-            }
+
             else if (NavHistory.IsChecked == true)
             {
                 HistoryPanel.Visibility = Visibility.Visible;

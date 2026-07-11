@@ -17,4 +17,10 @@
     <Resource Include="assets\app_icon.png" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="praat\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

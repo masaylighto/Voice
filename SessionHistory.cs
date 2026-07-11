@@ -35,6 +35,18 @@ namespace Voice
         public string EndingPitchDirection { get; set; } = "Not enough data";
         public string VoiceClassification { get; set; } = "Unknown";
         public List<PitchContourPoint> PitchContour { get; set; } = new List<PitchContourPoint>();
+
+        // Praat specific metrics
+        public float AverageF1Hz { get; set; }
+        public float AverageF2Hz { get; set; }
+        public float AverageF3Hz { get; set; }
+        public float AverageF4Hz { get; set; }
+        public float F2F1Ratio { get; set; }
+        public float FormantDispersion { get; set; }
+        public float SpeakingRate { get; set; }
+        public float JitterLocalPct { get; set; }
+        public float ShimmerLocalPct { get; set; }
+        public List<VoiceContourPoint> VoiceContour { get; set; } = new List<VoiceContourPoint>();
     }
 
     public static class SessionHistory
@@ -80,7 +92,7 @@ namespace Voice
 
         public static VoiceSessionRecord? SaveSession(VoiceAnalysisSession session, string tempWavPath)
         {
-            if (session.Frames.Count == 0) return null;
+            if (session.PitchContour.Count == 0) return null;
 
             try
             {
@@ -121,6 +133,30 @@ namespace Voice
                         TimeSeconds = point.TimeSeconds,
                         PitchHz = point.PitchHz,
                         Confidence = point.Confidence
+                    }).ToList(),
+                    AverageF1Hz = session.AverageF1Hz,
+                    AverageF2Hz = session.AverageF2Hz,
+                    AverageF3Hz = session.AverageF3Hz,
+                    AverageF4Hz = session.AverageF4Hz,
+                    F2F1Ratio = session.F2F1Ratio,
+                    FormantDispersion = session.FormantDispersion,
+                    SpeakingRate = session.SpeakingRate,
+                    JitterLocalPct = session.JitterLocalPct,
+                    ShimmerLocalPct = session.ShimmerLocalPct,
+                    VoiceContour = session.VoiceContour.Select(point => new VoiceContourPoint
+                    {
+                        TimeSeconds = point.TimeSeconds,
+                        PitchHz = point.PitchHz,
+                        F1Hz = point.F1Hz,
+                        F2Hz = point.F2Hz,
+                        F3Hz = point.F3Hz,
+                        F4Hz = point.F4Hz,
+                        F2F1Ratio = point.F2F1Ratio,
+                        ResonanceHz = point.ResonanceHz,
+                        WeightDb = point.WeightDb,
+                        IntensityDb = point.IntensityDb,
+                        JitterPct = point.JitterPct,
+                        ShimmerPct = point.ShimmerPct
                     }).ToList()
                 };
 

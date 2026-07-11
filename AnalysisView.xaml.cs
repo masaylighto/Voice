@@ -295,37 +295,11 @@ namespace Voice
             string rawReport;
             if (_currentSession != null)
             {
-                rawReport = ConstructRawReport(
-                    _currentSession.AveragePitchHz,
-                    _currentSession.MedianPitchHz,
-                    _currentSession.PitchP10Hz,
-                    _currentSession.PitchP90Hz,
-                    _currentSession.PitchCoverageRatio,
-                    _currentSession.RecordingDurationSeconds,
-                    _currentSession.AverageResonanceHz,
-                    _currentSession.AverageWeightDb,
-                    _currentSession.PitchStdDevSemitones,
-                    _currentSession.ArticulationRate,
-                    _currentSession.PauseRatio,
-                    _currentSession.VoiceClassification,
-                    _currentSession.EndingPitchDirection);
+                rawReport = ConstructRawReport(_currentSession);
             }
             else if (_currentRecord != null)
             {
-                rawReport = ConstructRawReport(
-                    _currentRecord.AveragePitchHz,
-                    _currentRecord.MedianPitchHz,
-                    _currentRecord.PitchP10Hz,
-                    _currentRecord.PitchP90Hz,
-                    _currentRecord.PitchCoverageRatio,
-                    _currentRecord.RecordingDurationSeconds,
-                    _currentRecord.AverageResonanceHz,
-                    _currentRecord.AverageWeightDb,
-                    _currentRecord.PitchStdDevSemitones,
-                    _currentRecord.ArticulationRate,
-                    _currentRecord.PauseRatio,
-                    _currentRecord.VoiceClassification,
-                    _currentRecord.EndingPitchDirection);
+                rawReport = ConstructRawReport(_currentRecord);
             }
             else
             {
@@ -352,46 +326,125 @@ namespace Voice
             }
         }
 
-        private static string ConstructRawReport(
-            float meanPitch,
-            float medianPitch,
-            float pitchP10,
-            float pitchP90,
-            float pitchCoverage,
-            float duration,
-            float resonance,
-            float weight,
-            float intonation,
-            float rate,
-            float pause,
-            string classification,
-            string endingDirection)
+        private static string ConstructRawReport(VoiceAnalysisSession session)
         {
             StringBuilder sb = new StringBuilder();
             sb.AppendLine("=== VOICE MEASUREMENT REPORT ===");
             sb.AppendLine($"Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            sb.AppendLine($"Pitch Profile: {classification}");
+            sb.AppendLine($"Pitch Profile: {session.VoiceClassification}");
             sb.AppendLine();
             sb.AppendLine("1. Fundamental Frequency (F0)");
-            sb.AppendLine($"   Median F0:       {FormatFrequency(medianPitch)}");
-            sb.AppendLine($"   Trimmed Mean F0: {FormatFrequency(meanPitch)}");
-            sb.AppendLine($"   Central 80%:     {FormatRange(pitchP10, pitchP90)}");
-            sb.AppendLine($"   F0 Coverage:     {FormatPercentage(pitchCoverage)} of analysis frames");
-            sb.AppendLine($"   Recording Span:  {FormatDuration(duration)}");
-            sb.AppendLine("   Method: YIN F0 tracking, 65-500 Hz, confidence gate >= 0.70.");
+            sb.AppendLine($"   Median F0:         {FormatFrequency(session.MedianPitchHz)}");
+            sb.AppendLine($"   Trimmed Mean F0:   {FormatFrequency(session.AveragePitchHz)}");
+            sb.AppendLine($"   Central 80%:       {FormatRange(session.PitchP10Hz, session.PitchP90Hz)}");
+            sb.AppendLine($"   F0 Coverage:       {FormatPercentage(session.PitchCoverageRatio)} of analysis frames");
+            sb.AppendLine($"   Recording Span:    {FormatDuration(session.RecordingDurationSeconds)}");
             sb.AppendLine();
-            sb.AppendLine("2. Spectral Characteristics");
-            sb.AppendLine($"   Spectral Centroid: {FormatFrequency(resonance)}");
-            sb.AppendLine($"   Spectral Balance:  {weight:F2} dB (80-250 Hz vs 250-3000 Hz band power)");
+            sb.AppendLine("2. Resonant Formants & Spacing");
+            sb.AppendLine($"   Formant F1:        {FormatFrequency(session.AverageF1Hz)}");
+            sb.AppendLine($"   Formant F2:        {FormatFrequency(session.AverageF2Hz)}");
+            sb.AppendLine($"   Formant F3:        {FormatFrequency(session.AverageF3Hz)}");
+            sb.AppendLine($"   Formant F4:        {FormatFrequency(session.AverageF4Hz)}");
+            sb.AppendLine($"   F2/F1 Spacing:     {(session.F2F1Ratio > 0 ? $"{session.F2F1Ratio:F3}" : "Not available")}");
+            sb.AppendLine($"   Formant Dispersion: {FormatFrequency(session.FormantDispersion)}");
+            sb.AppendLine($"   Spectral Centroid: {FormatFrequency(session.AverageResonanceHz)}");
             sb.AppendLine();
-            sb.AppendLine("3. Pitch Variation and Speech Timing");
-            sb.AppendLine($"   F0 Standard Dev: {intonation:F2} semitones");
-            sb.AppendLine($"   Pacing Estimate: {rate:F2} syllables per active second");
-            sb.AppendLine($"   Pause Ratio:     {pause * 100f:F1}% (RMS < 0.008)");
-            sb.AppendLine($"   Ending Contour:  {endingDirection}");
+            sb.AppendLine("3. Vocal Weight & Stability");
+            sb.AppendLine($"   Spectral Balance:  {session.AverageWeightDb:F2} dB (80-250 Hz vs 250-3000 Hz band power)");
+            sb.AppendLine($"   Local Jitter:      {(session.JitterLocalPct > 0 ? $"{session.JitterLocalPct:F3}%" : "Not available")}");
+            sb.AppendLine($"   Local Shimmer:     {(session.ShimmerLocalPct > 0 ? $"{session.ShimmerLocalPct:F3}%" : "Not available")}");
+            sb.AppendLine();
+            sb.AppendLine("4. Pitch Variation & Speech Timing");
+            sb.AppendLine($"   F0 Standard Dev:   {session.PitchStdDevSemitones:F2} semitones");
+            sb.AppendLine($"   Articulation Rate: {session.ArticulationRate:F2} syllables per active second");
+            sb.AppendLine($"   Speaking Rate:     {session.SpeakingRate:F2} syllables per total second");
+            sb.AppendLine($"   Pause Ratio:       {session.PauseRatio * 100f:F1}% (Silence threshold: < -25dB)");
+            sb.AppendLine($"   Ending Contour:    {session.EndingPitchDirection}");
             sb.AppendLine();
             sb.AppendLine("Note: pitch presentation is an acoustic comparison. It does not determine gender identity.");
             sb.AppendLine("================================");
+            sb.AppendLine();
+
+            var contourData = session.VoiceContour;
+            if (contourData != null && contourData.Count > 0)
+            {
+                sb.AppendLine("---TIME_SERIES---");
+                sb.AppendLine("Time(s),Pitch(Hz),F1(Hz),F2(Hz),F3(Hz),F4(Hz),F2F1Ratio,Resonance(Hz),VocalWeight(dB),Intensity(dB),Jitter(%),Shimmer(%)");
+                foreach (var p in contourData)
+                {
+                    sb.AppendLine(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "{0:F2},{1:F1},{2:F1},{3:F1},{4:F1},{5:F1},{6:F3},{7:F1},{8:F2},{9:F1},{10:F3},{11:F3}",
+                        p.TimeSeconds, p.PitchHz, p.F1Hz, p.F2Hz, p.F3Hz, p.F4Hz, p.F2F1Ratio, p.ResonanceHz, p.WeightDb, p.IntensityDb, p.JitterPct, p.ShimmerPct));
+                }
+            }
+
+
+            return sb.ToString();
+        }
+
+        private static string ConstructRawReport(VoiceSessionRecord record)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("=== VOICE MEASUREMENT REPORT ===");
+            sb.AppendLine($"Timestamp: {record.Timestamp:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"Pitch Profile: {record.VoiceClassification}");
+            sb.AppendLine();
+            sb.AppendLine("1. Fundamental Frequency (F0)");
+            sb.AppendLine($"   Median F0:         {FormatFrequency(record.MedianPitchHz)}");
+            sb.AppendLine($"   Trimmed Mean F0:   {FormatFrequency(record.AveragePitchHz)}");
+            sb.AppendLine($"   Central 80%:       {FormatRange(record.PitchP10Hz, record.PitchP90Hz)}");
+            sb.AppendLine($"   F0 Coverage:       {FormatPercentage(record.PitchCoverageRatio)} of analysis frames");
+            sb.AppendLine($"   Recording Span:    {FormatDuration(record.RecordingDurationSeconds)}");
+            sb.AppendLine();
+            sb.AppendLine("2. Resonant Formants & Spacing");
+            sb.AppendLine($"   Formant F1:        {FormatFrequency(record.AverageF1Hz)}");
+            sb.AppendLine($"   Formant F2:        {FormatFrequency(record.AverageF2Hz)}");
+            sb.AppendLine($"   Formant F3:        {FormatFrequency(record.AverageF3Hz)}");
+            sb.AppendLine($"   Formant F4:        {FormatFrequency(record.AverageF4Hz)}");
+            sb.AppendLine($"   F2/F1 Spacing:     {(record.F2F1Ratio > 0 ? $"{record.F2F1Ratio:F3}" : "Not available")}");
+            sb.AppendLine($"   Formant Dispersion: {FormatFrequency(record.FormantDispersion)}");
+            sb.AppendLine($"   Spectral Centroid: {FormatFrequency(record.AverageResonanceHz)}");
+            sb.AppendLine();
+            sb.AppendLine("3. Vocal Weight & Stability");
+            sb.AppendLine($"   Spectral Balance:  {record.AverageWeightDb:F2} dB (80-250 Hz vs 250-3000 Hz band power)");
+            sb.AppendLine($"   Local Jitter:      {(record.JitterLocalPct > 0 ? $"{record.JitterLocalPct:F3}%" : "Not available")}");
+            sb.AppendLine($"   Local Shimmer:     {(record.ShimmerLocalPct > 0 ? $"{record.ShimmerLocalPct:F3}%" : "Not available")}");
+            sb.AppendLine();
+            sb.AppendLine("4. Pitch Variation & Speech Timing");
+            sb.AppendLine($"   F0 Standard Dev:   {record.PitchStdDevSemitones:F2} semitones");
+            sb.AppendLine($"   Articulation Rate: {record.ArticulationRate:F2} syllables per active second");
+            sb.AppendLine($"   Speaking Rate:     {record.SpeakingRate:F2} syllables per total second");
+            sb.AppendLine($"   Pause Ratio:       {record.PauseRatio * 100f:F1}% (Silence threshold: < -25dB)");
+            sb.AppendLine($"   Ending Contour:    {record.EndingPitchDirection}");
+            sb.AppendLine();
+            sb.AppendLine("Note: pitch presentation is an acoustic comparison. It does not determine gender identity.");
+            sb.AppendLine("================================");
+            sb.AppendLine();
+
+            var contourData = record.VoiceContour;
+            if (contourData != null && contourData.Count > 0)
+            {
+                sb.AppendLine("---TIME_SERIES---");
+                sb.AppendLine("Time(s),Pitch(Hz),F1(Hz),F2(Hz),F3(Hz),F4(Hz),F2F1Ratio,Resonance(Hz),VocalWeight(dB),Intensity(dB),Jitter(%),Shimmer(%)");
+                foreach (var p in contourData)
+                {
+                    sb.AppendLine(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "{0:F2},{1:F1},{2:F1},{3:F1},{4:F1},{5:F1},{6:F3},{7:F1},{8:F2},{9:F1},{10:F3},{11:F3}",
+                        p.TimeSeconds, p.PitchHz, p.F1Hz, p.F2Hz, p.F3Hz, p.F4Hz, p.F2F1Ratio, p.ResonanceHz, p.WeightDb, p.IntensityDb, p.JitterPct, p.ShimmerPct));
+                }
+            }
+            else if (record.PitchContour != null && record.PitchContour.Count > 0)
+            {
+                sb.AppendLine("---TIME_SERIES---");
+                sb.AppendLine("Time(s),Pitch(Hz)");
+                foreach (var p in record.PitchContour)
+                {
+                    sb.AppendLine(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "{0:F2},{1:F1}",
+                        p.TimeSeconds, p.PitchHz));
+                }
+            }
+
             return sb.ToString();
         }
 
