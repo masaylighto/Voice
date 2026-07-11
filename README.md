@@ -1,75 +1,60 @@
-# Voice Lab 🎙️
+# Voice Lab
 
-Voice Lab is a native Windows WPF desktop application designed for real-time vocal analysis, diagnostics, and target training. 
-
-> [!IMPORTANT]
-> **AI Development Notice**
-> This entire codebase, including user interface styling, audio engineering, and digital signal processing, was created, compiled, and verified **entirely by AI (Antigravity)**. The code has **never been manually written, read, or modified by a human developer**. 
-
----
+Voice Lab is a native Windows WPF application for recording speech, tracking fundamental frequency (F0), and reviewing voice measurements over time.
 
 ## Core Features
 
-1. **Voice Capture & Live Feedback**:
-   - Captures microphone input at 44.1 kHz, 16-bit Mono.
-   - Renders a real-time visualizer canvas featuring background grid lines and a SoundCloud-style filled gradient waveform.
-   - Displays live fundamental frequency (F0) estimations in real time.
+1. Voice capture and live feedback
+   - Captures microphone input at 44.1 kHz, 16-bit mono.
+   - Shows a live F0 contour with time on the horizontal axis and pitch in Hz on the vertical axis.
+   - Preserves the complete pitch contour for the final report, including gaps for unvoiced audio.
 
-2. **Reading Prompt Assistant**:
-   - Hosts a scrollable database of vocal prompts categorized into Speech Pathology classics (e.g., *The Rainbow Passage*, *The Grandfather Passage*), phonetically balanced *Harvard Sentences*, and targeted voice exercises.
+2. Voice measurements
+   - Reports median F0, trimmed mean F0, central 80% F0 range, tracking coverage, and recording duration.
+   - Shows a full-recording pitch contour instead of a single peak.
+   - Reports spectral brightness, spectral balance, pitch variation, and timing as separate descriptive measurements.
+   - Uses an acoustic pitch-presentation reference based on F0 only; it does not infer gender identity.
 
-3. **Vocal Diagnostics Console**:
-   - Parses the recorded audio sample and rates the voice on a unified scale from `0` (Masculine) to `50` (Androgynous) to `100` (Feminine) across 5 metrics:
-     - **Pitch**: The frequency of vocal fold vibration.
-     - **Resonance**: Sound placement (dark/chest resonance vs bright/nasal head resonance).
-     - **Weight**: Vocal thickness (chesty/buzzy thickness vs light/breathy thinness).
-     - **Intonation**: Melody and expression (flat monotone vs sweeping melodic variation).
-     - **Speech Patterns**: Phrase pacing, breathing pauses, and end-of-sentence pitch curves (e.g. rising inflections).
-   - Displays custom monospace grid block progress bars (e.g. `█ █ █ █ █ █ █ █ ░ ░`) alongside scientific scale spectrum sliders.
-   - Provides concrete, science-based training exercises tailored to each metric.
+3. Live trainer
+   - Offers pitch and spectral-brightness practice with a target band and scrolling line.
 
-4. **Vocal Trainer (Live Practice)**:
-   - Select a vocal property (Pitch or Resonance) and a target range (Masculine, Androgynous, or Feminine).
-   - Practice vocalizing against a green target band. The app plots a live scrolling line of your voice, giving immediate visual feedback and coaching tips.
+4. History
+   - Saves voice sessions in `%APPDATA%/VoiceTester/history.json`.
+   - Stores the pitch contour for newly created history entries.
 
-5. **History Log & Persistence**:
-   - Saves vocal sessions locally in `%APPDATA%/VoiceTester/history.json`.
-   - Copies audio recordings permanently to the user folder, allowing you to load past reports or replay recordings to track progress.
+## Signal Processing
 
----
-
-## Signal Processing & Metrics Breakdown
-
-| Metric | Scientific Basis | Target Ranges |
+| Measurement | Method | Interpretation |
 | :--- | :--- | :--- |
-| **Pitch (F0)** | Time-domain **Autocorrelation** with Sondhi center-clipping (to filter out formants) and parabolic peak interpolation. | **Masculine**: 85 - 155 Hz<br>**Androgynous**: 155 - 185 Hz<br>**Female**: 185 - 255+ Hz |
-| **Resonance** | **Spectral Centroid** calculated from positive FFT magnitude coefficients within the speech vocal tract band (300 Hz - 3000 Hz). | **Masculine (Dark)**: Lower frequencies<br>**Androgynous**: Moderate frequencies<br>**Feminine (Bright)**: Higher frequencies |
-| **Vocal Weight** | **Spectral Tilt** calculated as the decibel energy ratio of the low fundamental band (80 - 250 Hz) vs the mid-high harmonic band (250 - 3000 Hz). | **Masculine (Heavy)**: Strong lower harmonics (+8 dB)<br>**Androgynous**: Balanced harmonics (0 dB)<br>**Feminine (Light)**: High-frequency tilt / breathy (-8 dB) |
-| **Intonation** | Pitch contour variance converted to perception-aligned **Semitones** ($S = 12 \log_2(F_0 / 55)$). | **Masculine**: Monotonic (SD < 1.0 semitones)<br>**Androgynous**: Balanced<br>**Feminine**: Melodic/Sweeping (SD > 3.0 semitones) |
-| **Speech Patterns** | Pause ratio (energy gate), articulation rate (short-time RMS envelope peak tracking), and ending pitch contour regression slope. | **Masculine**: Direct, staccato, falling inflections<br>**Androgynous**: Steady rhythm<br>**Feminine**: Breathy phrasing, rising sweeps |
+| Pitch (F0) | YIN cumulative mean normalized difference function with sub-sample interpolation, a 65-500 Hz search range, and confidence gating. | Pitch presentation reference: masculine-leaning below 130 Hz, androgynous 145-175 Hz, feminine-leaning above 180 Hz. F0 alone does not identify a person's gender. |
+| Spectral Brightness | Spectral centroid from positive FFT magnitudes in the 300-3000 Hz speech band. | A relative brightness measure, not a direct formant or vocal-tract-size estimate. |
+| Spectral Balance | dB ratio of average power in 80-250 Hz and 250-3000 Hz bands. | Best for comparing recordings made with the same microphone and distance; it is not a direct vocal-fold-closure measurement. |
+| Pitch Variation | Standard deviation of tracked F0 in semitones: `12 * log2(F0 / 55)`. | Lower values are steadier; higher values show a wider pitch contour in the recording. |
+| Speech Timing | Pause ratio, amplitude-envelope pacing estimate, and final voiced-pitch direction. | Describes the recording and is not used for pitch-presentation labeling. |
 
----
+## Build and Run
 
-## How to Build and Run
+Prerequisites:
 
-### Prerequisites
-- **.NET SDK 10.0** (or compatible newer version) installed.
-- Windows Operating System (required for WPF native controls).
+- .NET SDK 10.0 or compatible newer version.
+- Windows, required for WPF audio capture and UI.
 
-### Run Diagnostic Validation
-We built an automated test runner into the entry point to verify DSP accuracy on synthetic waves. Run:
+Run the DSP validation:
+
 ```powershell
 dotnet run -- --test-dsp-headless
 ```
-This processes mathematical sine waves and writes verification results to `dsp_test_results.log`. (All diagnostics should output `PASSED`).
 
-### Build & Run the GUI Application
-1. **Build**:
-   ```powershell
-   dotnet build -c Release
-   ```
-2. **Run**:
-   ```powershell
-   dotnet run
-   ```
-   *(Or launch the executable directly from `bin/Release/net10.0-windows/Voice.exe`)*
+The validation writes `dsp_test_results.log` and exits nonzero on a failed diagnostic.
+
+Build the application:
+
+```powershell
+dotnet build -c Release
+```
+
+Run the application:
+
+```powershell
+dotnet run
+```

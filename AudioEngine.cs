@@ -13,11 +13,11 @@ namespace Voice
         private readonly List<float> _sampleBuffer = new List<float>();
         private readonly VoiceAnalysisSession _currentSession = new VoiceAnalysisSession();
         private bool _isRecording;
+        private long _processedFrameCount;
 
         // Callbacks
         public event Action<FrameMetrics>? LiveFrameProcessed;
         public event Action<VoiceAnalysisSession>? RecordingFinished;
-        public event Action<float[]>? RawSamplesCaptured; // For oscilloscope/waveform drawing
 
         public bool IsRecording => _isRecording;
         public string? TempWavPath => _tempWavPath;
@@ -28,6 +28,7 @@ namespace Voice
 
             _sampleBuffer.Clear();
             _currentSession.Frames.Clear();
+            _processedFrameCount = 0;
             
             // Set up temp WAV file path
             _tempWavPath = Path.Combine(Path.GetTempPath(), $"voice_test_{Guid.NewGuid()}.wav");
@@ -87,15 +88,12 @@ namespace Voice
                 newSamples[i] = sample / 32768.0f;
             }
 
-            // Raise raw samples event for the live waveform visualizer
-            RawSamplesCaptured?.Invoke(newSamples);
-
             // Append to sliding buffer for DSP analysis
             _sampleBuffer.AddRange(newSamples);
 
-            // 3. Process buffer in 2048-sample frames with 50% overlap (1024 sample slide)
-            int frameSize = 2048;
-            int hopSize = 1024;
+            // Process 46 ms frames with a 23 ms hop so the contour has a useful time resolution.
+            int frameSize = DspProcessor.AnalysisFrameSize;
+            int hopSize = DspProcessor.AnalysisHopSize;
 
             while (_sampleBuffer.Count >= frameSize)
             {
@@ -104,6 +102,8 @@ namespace Voice
 
                 // Run DSP processing on the frame
                 FrameMetrics metrics = DspProcessor.ProcessFrame(frame, 44100);
+                metrics.TimeSeconds = _processedFrameCount * hopSize / 44100f;
+                _processedFrameCount++;
 
                 // Accumulate in current session
                 _currentSession.AddFrame(metrics);

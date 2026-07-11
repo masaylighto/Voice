@@ -4,7 +4,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
-using NAudio.Dsp;
 
 namespace Voice
 {
@@ -19,7 +18,8 @@ namespace Voice
 
         private string? _currentCategory;
         private int _currentPromptIndex = 0;
-        private float[]? _smoothMagnitudes;
+        private readonly Queue<float> _livePitchHistory = new Queue<float>();
+        private const int MaxLivePitchPoints = 240;
 
         // Event to notify MainWindow that we completed a recording and want to view analysis
         public event Action<VoiceAnalysisSession, string>? AnalysisRequested;
@@ -50,152 +50,127 @@ namespace Voice
         public void SetAudioEngine(AudioEngine audioEngine)
         {
             _audioEngine = audioEngine;
-            _audioEngine.RawSamplesCaptured += AudioEngine_RawSamplesCaptured;
             _audioEngine.LiveFrameProcessed += AudioEngine_LiveFrameProcessed;
             _audioEngine.RecordingFinished += AudioEngine_RecordingFinished;
         }
 
         private void ResetVisualizer()
         {
-            if (WaveCanvas.ActualWidth > 0 && WaveCanvas.ActualHeight > 0)
-            {
-                WavePolyline.Points.Clear();
-                WavePolygon.Points.Clear();
-                
-                // Draw a flat baseline when idle (at the bottom of the canvas)
-                double baselineY = WaveCanvas.ActualHeight - 2;
-                WavePolyline.Points.Add(new Point(0, baselineY));
-                WavePolyline.Points.Add(new Point(WaveCanvas.ActualWidth, baselineY));
-                
-                // Draw background grid lines
-                DrawGridLines();
-            }
+            DrawGridLines();
+            DrawLivePitchContour();
         }
 
         private void DrawGridLines()
         {
-            if (WaveCanvas.ActualWidth <= 0 || WaveCanvas.ActualHeight <= 0) return;
-            
-            var geometry = new GeometryGroup();
-            double w = WaveCanvas.ActualWidth;
-            double h = WaveCanvas.ActualHeight;
-            
-            // Horizontal grid lines
-            for (double y = 30; y < h; y += 30)
+            if (WaveCanvas.ActualWidth <= 0 || WaveCanvas.ActualHeight <= 0)
             {
-                geometry.Children.Add(new LineGeometry(new Point(0, y), new Point(w, y)));
+                return;
             }
-            
-            // Vertical grid lines
-            for (double x = 45; x < w; x += 45)
+
+            const float minPitch = 65f;
+            const float maxPitch = 300f;
+            double width = WaveCanvas.ActualWidth;
+            double chartHeight = Math.Max(1, WaveCanvas.ActualHeight - 42);
+            Func<float, double> pitchToY = pitch =>
+                Math.Clamp((maxPitch - pitch) / (maxPitch - minPitch) * chartHeight, 0, chartHeight);
+
+            SetLivePitchBand(LiveMasculineBand, width, pitchToY, minPitch, 130f);
+            SetLivePitchBand(LiveAndrogynousBand, width, pitchToY, 145f, 175f);
+            SetLivePitchBand(LiveFeminineBand, width, pitchToY, 180f, maxPitch);
+
+            GeometryGroup geometry = new GeometryGroup();
+            for (int i = 0; i <= 4; i++)
             {
-                geometry.Children.Add(new LineGeometry(new Point(x, 0), new Point(x, h)));
+                double y = chartHeight * i / 4d;
+                geometry.Children.Add(new LineGeometry(new Point(0, y), new Point(width, y)));
             }
-            
+
+            for (int i = 0; i <= 6; i++)
+            {
+                double x = width * i / 6d;
+                geometry.Children.Add(new LineGeometry(new Point(x, 0), new Point(x, chartHeight)));
+            }
+
             GridLinesPath.Data = geometry;
         }
 
-        private void AudioEngine_RawSamplesCaptured(float[] samples)
+        private static void SetLivePitchBand(FrameworkElement band, double width, Func<float, double> pitchToY, float lowPitch, float highPitch)
         {
-            // Thread-safe UI update
-            Dispatcher.BeginInvoke(new Action(() =>
+            double yTop = pitchToY(highPitch);
+            double yBottom = pitchToY(lowPitch);
+            Canvas.SetLeft(band, 0);
+            Canvas.SetTop(band, yTop);
+            band.Width = width;
+            band.Height = Math.Max(0, yBottom - yTop);
+        }
+
+        private void DrawLivePitchContour()
+        {
+            if (WaveCanvas.ActualWidth <= 0 || WaveCanvas.ActualHeight <= 0)
             {
-                if (WaveCanvas.ActualWidth <= 0 || WaveCanvas.ActualHeight <= 0) return;
+                return;
+            }
 
-                double width = WaveCanvas.ActualWidth;
-                double height = WaveCanvas.ActualHeight;
+            const float minPitch = 65f;
+            const float maxPitch = 300f;
+            double width = WaveCanvas.ActualWidth;
+            double chartHeight = Math.Max(1, WaveCanvas.ActualHeight - 42);
+            float[] values = _livePitchHistory.ToArray();
+            int offset = MaxLivePitchPoints - values.Length;
+            double xStep = width / (MaxLivePitchPoints - 1d);
+            PathGeometry path = new PathGeometry();
+            PathFigure? currentFigure = null;
 
-                WavePolyline.Points.Clear();
-                WavePolygon.Points.Clear();
-
-                // Compute FFT on the captured sample buffer
-                int fftLen = 1024;
-                if (samples.Length < fftLen) return;
-
-                var complex = new Complex[fftLen];
-                for (int i = 0; i < fftLen; i++)
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (values[i] <= 0)
                 {
-                    // Apply Hanning Window to prevent spectral leakage
-                    float window = 0.5f * (1.0f - (float)Math.Cos(2.0 * Math.PI * i / (fftLen - 1)));
-                    complex[i].X = samples[i] * window;
-                    complex[i].Y = 0f;
+                    currentFigure = null;
+                    continue;
                 }
 
-                int m = (int)Math.Log2(fftLen);
-                FastFourierTransform.FFT(true, m, complex);
-
-                // We display the vocal speech band (DC to ~3500 Hz)
-                // At 44.1kHz sample rate, bin spacing is 44100 / 1024 = 43.07 Hz.
-                // 3500 Hz corresponds to bin index: 3500 / 43.07 = 81.
-                int startBin = 2; // skip DC and low sub-bass rumble
-                int endBin = 85;  // covers up to ~3660 Hz
-                int numBins = endBin - startBin;
-
-                float[] magnitudes = new float[numBins];
-                for (int i = 0; i < numBins; i++)
+                double x = (i + offset) * xStep;
+                double y = Math.Clamp((maxPitch - values[i]) / (maxPitch - minPitch) * chartHeight, 0, chartHeight);
+                Point point = new Point(x, y);
+                if (currentFigure == null)
                 {
-                    var c = complex[i + startBin];
-                    magnitudes[i] = (float)Math.Sqrt(c.X * c.X + c.Y * c.Y);
+                    currentFigure = new PathFigure { StartPoint = point, IsClosed = false, IsFilled = false };
+                    path.Figures.Add(currentFigure);
                 }
-
-                // Initialize smoothing buffer if needed
-                if (_smoothMagnitudes == null || _smoothMagnitudes.Length != numBins)
+                else
                 {
-                    _smoothMagnitudes = new float[numBins];
+                    currentFigure.Segments.Add(new LineSegment(point, true));
                 }
+            }
 
-                // Apply exponential smoothing (rise fast, decay slow) to make the bars smooth and fluid
-                for (int i = 0; i < numBins; i++)
-                {
-                    float target = magnitudes[i];
-                    if (target > _smoothMagnitudes[i])
-                        _smoothMagnitudes[i] = 0.4f * _smoothMagnitudes[i] + 0.6f * target;
-                    else
-                        _smoothMagnitudes[i] = 0.75f * _smoothMagnitudes[i] + 0.25f * target;
-                }
-
-                // Start polygon path at the bottom left corner
-                WavePolygon.Points.Add(new Point(0, height));
-
-                double xStep = width / (numBins - 1);
-                double lastX = 0;
-
-                for (int i = 0; i < numBins; i++)
-                {
-                    double x = i * xStep;
-                    
-                    // Convert magnitude to vertical pixel height
-                    // We apply a square-root scaling for better visualization of quiet signals
-                    double y = height - (Math.Sqrt(_smoothMagnitudes[i]) * height * 1.8);
-                    y = Math.Clamp(y, 4, height - 2); // keep within visual range
-
-                    var p = new Point(x, y);
-                    WavePolyline.Points.Add(p);
-                    WavePolygon.Points.Add(p);
-
-                    lastX = x;
-                }
-
-                // Close polygon path at the bottom right corner
-                WavePolygon.Points.Add(new Point(lastX, height));
-                WavePolygon.Points.Add(new Point(0, height));
-            }));
+            LivePitchPath.Data = path;
         }
 
         private void AudioEngine_LiveFrameProcessed(FrameMetrics metrics)
         {
             Dispatcher.BeginInvoke(new Action(() =>
             {
+                _livePitchHistory.Enqueue(metrics.IsVoiced ? metrics.Pitch : 0f);
+                if (_livePitchHistory.Count > MaxLivePitchPoints)
+                {
+                    _livePitchHistory.Dequeue();
+                }
+                DrawLivePitchContour();
+
                 if (metrics.IsVoiced)
                 {
                     LivePitchText.Text = $"{Math.Round(metrics.Pitch)} Hz";
-                    // Dynamic coloring depending on gender range
-                    if (metrics.Pitch < 155f)
+                    if (metrics.Pitch < 130f)
                         LivePitchText.Foreground = (SolidColorBrush)Application.Current.Resources["MaleBrush"];
-                    else if (metrics.Pitch < 185f)
+                    else if (metrics.Pitch < 180f)
                         LivePitchText.Foreground = (SolidColorBrush)Application.Current.Resources["AndroBrush"];
                     else
                         LivePitchText.Foreground = (SolidColorBrush)Application.Current.Resources["FemaleBrush"];
+                }
+                else
+                {
+                    LivePitchText.Text = "--- Hz";
+                    LivePitchText.Foreground = (SolidColorBrush)Application.Current.Resources["TextSecondaryBrush"];
                 }
             }));
         }
@@ -223,8 +198,7 @@ namespace Voice
                 PlayButton.Visibility = Visibility.Visible;
                 AnalyzeBtn.IsEnabled = true;
 
-                // Reset visualizer to center flat line
-                ResetVisualizer();
+                DrawLivePitchContour();
             }));
         }
 
@@ -249,6 +223,8 @@ namespace Voice
                     LiveTimerText.Text = "0.0s";
                     LivePitchText.Text = "--- Hz";
                     LivePitchText.Foreground = (SolidColorBrush)Application.Current.Resources["AccentBrush"];
+                    _livePitchHistory.Clear();
+                    ResetVisualizer();
                     _recordingTimer?.Start();
 
                     // Update UI state

@@ -6,71 +6,76 @@ namespace Voice
     public struct FrameMetrics
     {
         public float Pitch;             // Hz (0 if unvoiced)
+        public float PitchConfidence;   // 0-1 confidence from the F0 estimator
+        public float TimeSeconds;       // Start time of the analysis frame
         public float ResonanceCentroid; // Hz
-        public float VocalWeightDb;     // dB (low band vs mid-high band energy)
+        public float VocalWeightDb;     // dB (low vs mid-high spectral energy)
         public float Rms;               // RMS amplitude
-        public bool IsVoiced;           // True if pitch was successfully detected and signal is voiced
+        public bool IsVoiced;           // True when F0 passed the confidence gate
     }
 
     public static class DspProcessor
     {
-        private const int FftLength = 2048;
+        public const int AnalysisFrameSize = 2048;
+        public const int AnalysisHopSize = 1024;
+
+        private const float MinimumPitchHz = 65f;
+        private const float MaximumPitchHz = 500f;
+        private const float YinThreshold = 0.15f;
+        private const float MinimumPitchConfidence = 0.70f;
         private static readonly float[] HannWindowCache;
 
         static DspProcessor()
         {
-            // Cache Hanning window coefficients
-            HannWindowCache = new float[FftLength];
-            for (int i = 0; i < FftLength; i++)
+            HannWindowCache = new float[AnalysisFrameSize];
+            for (int i = 0; i < AnalysisFrameSize; i++)
             {
-                HannWindowCache[i] = 0.5f * (1.0f - (float)Math.Cos(2.0 * Math.PI * i / (FftLength - 1)));
+                HannWindowCache[i] = 0.5f * (1.0f - (float)Math.Cos(2.0 * Math.PI * i / (AnalysisFrameSize - 1)));
             }
         }
 
         /// <summary>
-        /// Processes a 2048-sample frame of 16-bit mono 44.1kHz audio (passed as floats in range -1.0 to 1.0).
+        /// Processes one mono analysis frame. Pitch is estimated with YIN's cumulative
+        /// mean normalized difference function, which is less prone to harmonic peaks
+        /// and octave errors than selecting the largest autocorrelation peak.
         /// </summary>
         public static FrameMetrics ProcessFrame(float[] samples, int sampleRate = 44100)
         {
-            if (samples.Length < FftLength)
+            if (samples.Length < AnalysisFrameSize)
             {
-                return new FrameMetrics { Pitch = 0, ResonanceCentroid = 0, VocalWeightDb = 0, Rms = 0, IsVoiced = false };
+                return new FrameMetrics();
             }
 
-            // 1. Calculate RMS Amplitude
             float sumSq = 0;
-            for (int i = 0; i < FftLength; i++)
+            for (int i = 0; i < AnalysisFrameSize; i++)
             {
                 sumSq += samples[i] * samples[i];
             }
-            float rms = (float)Math.Sqrt(sumSq / FftLength);
 
-            // Silence threshold: ignore frames that are too quiet (e.g. RMS < 0.01)
+            float rms = (float)Math.Sqrt(sumSq / AnalysisFrameSize);
             if (rms < 0.008f)
             {
-                return new FrameMetrics { Pitch = 0, ResonanceCentroid = 0, VocalWeightDb = 0, Rms = rms, IsVoiced = false };
+                return new FrameMetrics { Rms = rms };
             }
 
-            // 2. Pitch Detection using Center-Clipped Autocorrelation
-            float pitch = DetectPitchAutocorrelation(samples, sampleRate);
-            bool isVoiced = pitch > 50.0f && pitch < 500.0f;
+            PitchEstimate pitchEstimate = DetectPitchYin(samples, sampleRate);
+            bool isVoiced = pitchEstimate.Confidence >= MinimumPitchConfidence
+                && pitchEstimate.Hz >= MinimumPitchHz
+                && pitchEstimate.Hz <= MaximumPitchHz;
 
-            // 3. Spectral Analysis (FFT) for Resonance and Weight
-            Complex[] fftBuffer = new Complex[FftLength];
-            for (int i = 0; i < FftLength; i++)
+            Complex[] fftBuffer = new Complex[AnalysisFrameSize];
+            for (int i = 0; i < AnalysisFrameSize; i++)
             {
                 fftBuffer[i].X = samples[i] * HannWindowCache[i];
                 fftBuffer[i].Y = 0.0f;
             }
 
-            int m = (int)Math.Log2(FftLength);
+            int m = (int)Math.Log2(AnalysisFrameSize);
             FastFourierTransform.FFT(true, m, fftBuffer);
 
-            // Calculate magnitudes of positive frequencies
-            int numBins = FftLength / 2;
-            float binWidth = (float)sampleRate / FftLength;
+            int numBins = AnalysisFrameSize / 2;
+            float binWidth = (float)sampleRate / AnalysisFrameSize;
             float[] magnitudes = new float[numBins];
-            
             for (int i = 0; i < numBins; i++)
             {
                 float real = fftBuffer[i].X;
@@ -78,77 +83,13 @@ namespace Voice
                 magnitudes[i] = (float)Math.Sqrt(real * real + imag * imag);
             }
 
-            // 4. Calculate Resonance (Spectral Centroid in speech band: 300Hz - 3000Hz)
-            float sumFreqMag = 0;
-            float sumMag = 0;
-            
-            int minCentroidBin = (int)(300f / binWidth);
-            int maxCentroidBin = (int)(3000f / binWidth);
-            
-            minCentroidBin = Math.Clamp(minCentroidBin, 0, numBins - 1);
-            maxCentroidBin = Math.Clamp(maxCentroidBin, 0, numBins - 1);
-
-            for (int i = minCentroidBin; i <= maxCentroidBin; i++)
-            {
-                float freq = i * binWidth;
-                sumFreqMag += freq * magnitudes[i];
-                sumMag += magnitudes[i];
-            }
-
-            float centroid = sumMag > 1e-6f ? (sumFreqMag / sumMag) : 1200f; // default to neutral if empty
-
-            // 5. Calculate Vocal Weight (Normalized average energy density in low band 80-250Hz vs mid-high band 250-3000Hz)
-            float energyLow = 0;
-            float energyMidHigh = 0;
-
-            int lowBandMinBin = (int)(80f / binWidth);
-            int lowBandMaxBin = (int)(250f / binWidth);
-            int midHighBandMinBin = (int)(250f / binWidth);
-            int midHighBandMaxBin = (int)(3000f / binWidth);
-
-            lowBandMinBin = Math.Clamp(lowBandMinBin, 0, numBins - 1);
-            lowBandMaxBin = Math.Clamp(lowBandMaxBin, 0, numBins - 1);
-            midHighBandMinBin = Math.Clamp(midHighBandMinBin, 0, numBins - 1);
-            midHighBandMaxBin = Math.Clamp(midHighBandMaxBin, 0, numBins - 1);
-
-            int lowBinsCount = 0;
-            for (int i = lowBandMinBin; i <= lowBandMaxBin; i++)
-            {
-                energyLow += magnitudes[i] * magnitudes[i];
-                lowBinsCount++;
-            }
-
-            int midHighBinsCount = 0;
-            for (int i = midHighBandMinBin; i <= midHighBandMaxBin; i++)
-            {
-                energyMidHigh += magnitudes[i] * magnitudes[i];
-                midHighBinsCount++;
-            }
-
-            // Express as a ratio of average power spectral density in decibels
-            float weightDb = 0;
-            if (lowBinsCount > 0 && midHighBinsCount > 0)
-            {
-                float avgEnergyLow = energyLow / lowBinsCount;
-                float avgEnergyMidHigh = energyMidHigh / midHighBinsCount;
-
-                if (avgEnergyLow > 1e-10f && avgEnergyMidHigh > 1e-10f)
-                {
-                    weightDb = 10f * (float)Math.Log10(avgEnergyLow / avgEnergyMidHigh);
-                }
-                else if (avgEnergyLow > 1e-10f)
-                {
-                    weightDb = 15f; // high weight
-                }
-                else
-                {
-                    weightDb = -15f; // low weight
-                }
-            }
+            float centroid = CalculateSpectralCentroid(magnitudes, binWidth, 300f, 3000f);
+            float weightDb = CalculateSpectralBalance(magnitudes, binWidth);
 
             return new FrameMetrics
             {
-                Pitch = isVoiced ? pitch : 0,
+                Pitch = isVoiced ? pitchEstimate.Hz : 0,
+                PitchConfidence = pitchEstimate.Confidence,
                 ResonanceCentroid = centroid,
                 VocalWeightDb = weightDb,
                 Rms = rms,
@@ -156,118 +97,158 @@ namespace Voice
             };
         }
 
-        /// <summary>
-        /// Detects pitch using autocorrelation with center clipping.
-        /// Returns 0 if no clear pitch is found.
-        /// </summary>
-        private static float DetectPitchAutocorrelation(float[] samples, int sampleRate)
+        private static float CalculateSpectralCentroid(float[] magnitudes, float binWidth, float minFrequency, float maxFrequency)
         {
-            // Find max amplitude in the frame
-            float maxVal = 0;
-            for (int i = 0; i < FftLength; i++)
+            int minBin = Math.Clamp((int)(minFrequency / binWidth), 0, magnitudes.Length - 1);
+            int maxBin = Math.Clamp((int)(maxFrequency / binWidth), 0, magnitudes.Length - 1);
+            float sumFreqMag = 0;
+            float sumMag = 0;
+
+            for (int i = minBin; i <= maxBin; i++)
             {
-                float absVal = Math.Abs(samples[i]);
-                if (absVal > maxVal) maxVal = absVal;
+                float magnitude = magnitudes[i];
+                sumFreqMag += i * binWidth * magnitude;
+                sumMag += magnitude;
             }
 
-            if (maxVal < 1e-5f) return 0;
+            return sumMag > 1e-6f ? sumFreqMag / sumMag : 0;
+        }
 
-            // Apply center clipping (Sondhi's center clipping, threshold = 0.35 * max)
-            float clipLevel = maxVal * 0.35f;
-            float[] clipped = new float[FftLength];
-            for (int i = 0; i < FftLength; i++)
+        private static float CalculateSpectralBalance(float[] magnitudes, float binWidth)
+        {
+            float lowEnergy = CalculateAverageBandPower(magnitudes, binWidth, 80f, 250f);
+            float midHighEnergy = CalculateAverageBandPower(magnitudes, binWidth, 250f, 3000f);
+
+            if (lowEnergy <= 1e-10f || midHighEnergy <= 1e-10f)
             {
-                float val = samples[i];
-                if (val > clipLevel) clipped[i] = val - clipLevel;
-                else if (val < -clipLevel) clipped[i] = val + clipLevel;
-                else clipped[i] = 0.0f;
+                return 0;
             }
 
-            // Pitch range: 50 Hz to 500 Hz
-            int minLag = sampleRate / 500; // ~88 samples at 44.1kHz
-            int maxLag = sampleRate / 50;  // ~882 samples at 44.1kHz
+            return 10f * (float)Math.Log10(lowEnergy / midHighEnergy);
+        }
 
-            float[] r = new float[maxLag + 1];
-            float r0 = 0; // Autocorrelation at lag 0
+        private static float CalculateAverageBandPower(float[] magnitudes, float binWidth, float minFrequency, float maxFrequency)
+        {
+            int minBin = Math.Clamp((int)(minFrequency / binWidth), 0, magnitudes.Length - 1);
+            int maxBin = Math.Clamp((int)(maxFrequency / binWidth), 0, magnitudes.Length - 1);
+            float energy = 0;
+            int count = 0;
 
-            for (int i = 0; i < FftLength; i++)
+            for (int i = minBin; i <= maxBin; i++)
             {
-                r0 += clipped[i] * clipped[i];
+                energy += magnitudes[i] * magnitudes[i];
+                count++;
             }
 
-            if (r0 < 1e-7f) return 0;
+            return count == 0 ? 0 : energy / count;
+        }
 
-            // Average power at lag 0 (normalized by window length)
-            float avgPower0 = r0 / FftLength;
+        private static PitchEstimate DetectPitchYin(float[] samples, int sampleRate)
+        {
+            int minLag = Math.Max(2, (int)Math.Floor(sampleRate / MaximumPitchHz));
+            int maxLag = Math.Min(AnalysisFrameSize - 2, (int)Math.Ceiling(sampleRate / MinimumPitchHz));
+            if (maxLag <= minLag)
+            {
+                return default;
+            }
 
-            // Compute autocorrelation for lags in target range
+            // YIN is sensitive to DC offset, so center the frame before calculating differences.
+            float mean = 0;
+            for (int i = 0; i < AnalysisFrameSize; i++)
+            {
+                mean += samples[i];
+            }
+            mean /= AnalysisFrameSize;
+
+            float[] centered = new float[AnalysisFrameSize];
+            for (int i = 0; i < AnalysisFrameSize; i++)
+            {
+                centered[i] = samples[i] - mean;
+            }
+
+            double[] cmndf = new double[maxLag + 1];
+            double runningDifferenceSum = 0;
+
+            for (int lag = 1; lag <= maxLag; lag++)
+            {
+                double difference = 0;
+                int sampleCount = AnalysisFrameSize - lag;
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    double delta = centered[i] - centered[i + lag];
+                    difference += delta * delta;
+                }
+
+                runningDifferenceSum += difference;
+                cmndf[lag] = runningDifferenceSum > 1e-12
+                    ? difference * lag / runningDifferenceSum
+                    : 1.0;
+            }
+
+            int bestLag = -1;
             for (int lag = minLag; lag <= maxLag; lag++)
             {
-                float sum = 0;
-                int maxIdx = FftLength - lag;
-                for (int i = 0; i < maxIdx; i++)
+                if (cmndf[lag] < YinThreshold)
                 {
-                    sum += clipped[i] * clipped[i + lag];
+                    while (lag + 1 <= maxLag && cmndf[lag + 1] < cmndf[lag])
+                    {
+                        lag++;
+                    }
+
+                    bestLag = lag;
+                    break;
                 }
-                // Normalize by the actual number of overlapping samples to eliminate lag bias
-                r[lag] = sum / maxIdx;
             }
 
-            // Find the highest peak in the search range
-            int peakLag = -1;
-            float maxR = -1;
-
-            // Standard peak detection: must be a local maximum and exceed the threshold
-            for (int lag = minLag; lag <= maxLag; lag++)
+            if (bestLag < 0)
             {
-                if (r[lag] > maxR)
+                double lowestValue = double.MaxValue;
+                for (int lag = minLag + 1; lag < maxLag; lag++)
                 {
-                    // Check if it is a local maximum
-                    if (lag > minLag && lag < maxLag)
+                    if (cmndf[lag] <= cmndf[lag - 1]
+                        && cmndf[lag] < cmndf[lag + 1]
+                        && cmndf[lag] < lowestValue)
                     {
-                        if (r[lag] > r[lag - 1] && r[lag] > r[lag + 1])
-                        {
-                            maxR = r[lag];
-                            peakLag = lag;
-                        }
-                    }
-                    else
-                    {
-                        maxR = r[lag];
-                        peakLag = lag;
+                        bestLag = lag;
+                        lowestValue = cmndf[lag];
                     }
                 }
-            }
 
-            // Verify peak confidence (autocorrelation coefficient threshold, typically > 0.25)
-            float threshold = 0.25f * avgPower0;
-            if (peakLag == -1 || maxR < threshold)
-            {
-                return 0; // Unvoiced / too weak
-            }
-
-            // Parabolic interpolation for sub-sample accuracy
-            float exactLag = peakLag;
-            if (peakLag > minLag && peakLag < maxLag)
-            {
-                float alpha = r[peakLag - 1];
-                float beta = r[peakLag];
-                float gamma = r[peakLag + 1];
-                float denominator = alpha - 2 * beta + gamma;
-                if (Math.Abs(denominator) > 1e-7f)
+                if (bestLag < 0 || cmndf[bestLag] > 0.30)
                 {
-                    float p = 0.5f * (alpha - gamma) / denominator;
-                    exactLag += p;
+                    return default;
                 }
             }
 
-            float pitch = (float)sampleRate / exactLag;
-            if (pitch >= 50.0f && pitch <= 500.0f)
+            double refinedLag = bestLag;
+            if (bestLag > minLag && bestLag < maxLag)
             {
-                return pitch;
+                double before = cmndf[bestLag - 1];
+                double center = cmndf[bestLag];
+                double after = cmndf[bestLag + 1];
+                double denominator = before - (2.0 * center) + after;
+                if (Math.Abs(denominator) > 1e-12)
+                {
+                    double offset = 0.5 * (before - after) / denominator;
+                    refinedLag += Math.Clamp(offset, -0.5, 0.5);
+                }
             }
 
-            return 0;
+            float confidence = Math.Clamp(1f - (float)cmndf[bestLag], 0f, 1f);
+            float hz = (float)(sampleRate / refinedLag);
+            return new PitchEstimate(hz, confidence);
+        }
+
+        private readonly struct PitchEstimate
+        {
+            public PitchEstimate(float hz, float confidence)
+            {
+                Hz = hz;
+                Confidence = confidence;
+            }
+
+            public float Hz { get; }
+            public float Confidence { get; }
         }
     }
 }

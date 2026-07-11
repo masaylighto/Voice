@@ -28,7 +28,7 @@
                                FontSize="22" 
                                FontWeight="Bold" 
                                Foreground="{StaticResource TextPrimaryBrush}"/>
-                    <TextBlock Text="Your voice sample has been parsed across five primary characteristics." 
+                    <TextBlock Text="Pitch is measured across the full recording. The pitch profile is an acoustic reference, not an identity label."
                                FontFamily="Calibri" 
                                FontSize="13" 
                                Foreground="{StaticResource TextSecondaryBrush}"/>
@@ -36,7 +36,7 @@
                 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="RawMetricsBtn" 
-                            Content="Copy Raw Data" 
+                            Content="Copy Measurements"
                             Style="{StaticResource SecondaryButton}" 
                             Padding="12,6" 
                             FontSize="12" 
@@ -49,7 +49,7 @@
                             CornerRadius="8" 
                             Padding="16,8">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Classification: " 
+                            <TextBlock Text="Pitch profile: "
                                        FontFamily="Calibri" 
                                        FontSize="14" 
                                        FontWeight="SemiBold" 
@@ -67,8 +67,52 @@
             </Grid>
         </Border>
 
-        <!-- Main Workspace (2 Columns) -->
+        <!-- Recording-wide pitch contour -->
         <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="230"/>
+                <RowDefinition Height="16"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Style="{StaticResource CardPanel}" Padding="16">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Pitch Contour" FontFamily="Calibri" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <TextBlock x:Name="PitchChartSummaryText" Grid.Column="1" Text="Record a sample to see its F0 over time." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="12,0,0,0"/>
+                    </Grid>
+
+                    <Grid x:Name="PitchChartHost" Grid.Row="1" ClipToBounds="True" SizeChanged="PitchChartHost_SizeChanged">
+                        <Canvas x:Name="PitchChartCanvas" Background="#FBFCFF">
+                            <Rectangle x:Name="PitchMasculineBand" Fill="#FEF2F2"/>
+                            <Rectangle x:Name="PitchAndrogynousBand" Fill="#FFFBEB"/>
+                            <Rectangle x:Name="PitchFeminineBand" Fill="#EFF6FF"/>
+                            <Path x:Name="PitchChartGridPath" Stroke="#E2E8F0" StrokeThickness="1"/>
+                            <Path x:Name="PitchContourPath" Stroke="{StaticResource AccentBrush}" StrokeThickness="2.5" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                        </Canvas>
+
+                        <TextBlock x:Name="PitchChartTopLabel" Text="300 Hz" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,4,0,0" VerticalAlignment="Top" IsHitTestVisible="False"/>
+                        <TextBlock x:Name="PitchChartMidLabel" Text="180 Hz" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                        <TextBlock x:Name="PitchChartBottomLabel" Text="65 Hz" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0,0,16" VerticalAlignment="Bottom" IsHitTestVisible="False"/>
+                        <TextBlock x:Name="PitchChartStartTime" Text="0.0 s" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0,0,2" VerticalAlignment="Bottom" HorizontalAlignment="Left" IsHitTestVisible="False"/>
+                        <TextBlock x:Name="PitchChartMidTime" Text="" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,2" VerticalAlignment="Bottom" HorizontalAlignment="Center" IsHitTestVisible="False"/>
+                        <TextBlock x:Name="PitchChartEndTime" Text="" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,8,2" VerticalAlignment="Bottom" HorizontalAlignment="Right" IsHitTestVisible="False"/>
+                        <TextBlock x:Name="PitchChartStatusText" Text="No reliable voiced pitch was detected." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False"/>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- Main Workspace (2 Columns) -->
+            <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1.2*"/>
                 <ColumnDefinition Width="0.05*"/>
@@ -100,45 +144,45 @@
                             </Grid>
                             <Slider x:Name="PitchGauge" Style="{StaticResource GaugeSliderStyle}" Value="30"/>
                             <Grid Margin="0,-4,0,0">
-                                <TextBlock Text="Male (85-155)" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Androgynous" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Female (185-255+)" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
+                                <TextBlock Text="Masc &lt;130" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Left"/>
+                                <TextBlock Text="145-175" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Fem &gt;180" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
                             </Grid>
                         </StackPanel>
 
-                        <!-- RESONANCE -->
+                        <!-- SPECTRAL BRIGHTNESS -->
                         <StackPanel Margin="0,0,0,20">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Resonance" FontFamily="Calibri" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                <TextBlock Grid.Column="0" Text="Spectral Brightness" FontFamily="Calibri" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
                                 <TextBlock x:Name="ResRawText" Grid.Column="1" Text="1200 Hz" FontFamily="Calibri" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,1,0,0"/>
                             </Grid>
                             <Slider x:Name="ResGauge" Style="{StaticResource GaugeSliderStyle}" Value="50"/>
                             <Grid Margin="0,-4,0,0">
-                                <TextBlock Text="Chest/Dark" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Neutral" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Head/Bright" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
+                                <TextBlock Text="Lower centroid" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Left"/>
+                                <TextBlock Text="Mid" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Higher centroid" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
                             </Grid>
                         </StackPanel>
 
-                        <!-- WEIGHT -->
+                        <!-- SPECTRAL BALANCE -->
                         <StackPanel Margin="0,0,0,20">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Weight" FontFamily="Calibri" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                <TextBlock Grid.Column="0" Text="Spectral Balance" FontFamily="Calibri" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
                                 <TextBlock x:Name="WeightRawText" Grid.Column="1" Text="+4.5 dB" FontFamily="Calibri" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,1,0,0"/>
                             </Grid>
                             <Slider x:Name="WeightGauge" Style="{StaticResource GaugeSliderStyle}" Value="40"/>
                             <Grid Margin="0,-4,0,0">
-                                <TextBlock Text="Heavy (Thick)" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Medium" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Light (Thin)" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
+                                <TextBlock Text="Low-frequency" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Left"/>
+                                <TextBlock Text="Balanced" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="High-frequency" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
                             </Grid>
                         </StackPanel>
 
@@ -154,9 +198,9 @@
                             </Grid>
                             <Slider x:Name="IntGauge" Style="{StaticResource GaugeSliderStyle}" Value="60"/>
                             <Grid Margin="0,-4,0,0">
-                                <TextBlock Text="Monotonic" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Dynamic" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Melodic/Sweeping" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
+                                <TextBlock Text="Steady" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Left"/>
+                                <TextBlock Text="Moderate" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Variable" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
                             </Grid>
                         </StackPanel>
 
@@ -172,9 +216,9 @@
                             </Grid>
                             <Slider x:Name="PatternGauge" Style="{StaticResource GaugeSliderStyle}" Value="80"/>
                             <Grid Margin="0,-4,0,0">
-                                <TextBlock Text="Direct/Staccato" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Standard" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Fluid/Rising" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
+                                <TextBlock Text="Few pauses" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Left"/>
+                                <TextBlock Text="Mixed" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="More pauses" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
                             </Grid>
                         </StackPanel>
                     </StackPanel>
@@ -269,16 +313,16 @@
                         </TabItem>
 
                         <!-- RESONANCE TAB -->
-                        <TabItem Header="RESONANCE">
+                        <TabItem Header="SPECTRAL">
                             <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
                                 <StackPanel>
-                                    <TextBlock Text="Understanding Resonance" FontFamily="Calibri" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                    <TextBlock Text="Resonance is the space where your voice vibrates. Feminine resonance is 'bright' and 'forward' (vibrating in the mouth and nasal cavity). Masculine resonance is 'dark' and 'deep' (vibrating in the chest and lower throat)." 
+                                    <TextBlock Text="Understanding Spectral Brightness" FontFamily="Calibri" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <TextBlock Text="This measurement is the spectral centroid of active speech between 300 and 3000 Hz. Higher values indicate relatively more high-frequency energy. It is not a direct formant or vocal-tract measurement."
                                                TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,12"/>
 
                                     <Border Background="#F0F9FF" CornerRadius="8" Padding="12" Margin="0,0,0,12" BorderBrush="#BAE6FD" BorderThickness="1">
                                         <StackPanel>
-                                            <TextBlock Text="Tips to brighten Resonance (Feminine)" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#0369A1"/>
+                                    <TextBlock Text="Practice a Brighter Sound" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#0369A1"/>
                                             <TextBlock Text="• Swallow-holding or humming with lips closed but teeth apart. Feel the vibration on your lips and nose.&#x0a;• Shorten your vocal tract: lift the larynx slightly (like when you begin a swallow) and bring your tongue forward.&#x0a;• Practice vowels 'ee' and 'oo' to keep the tone bright." 
                                                        TextWrapping="Wrap" FontSize="12" Foreground="#0284C7" Margin="0,4,0,0"/>
                                         </StackPanel>
@@ -286,7 +330,7 @@
 
                                     <Border Background="#FFF1F2" CornerRadius="8" Padding="12" BorderBrush="#FECDD3" BorderThickness="1">
                                         <StackPanel>
-                                            <TextBlock Text="Tips to darken Resonance (Masculine)" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#BE123C"/>
+                                    <TextBlock Text="Practice a Darker Sound" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#BE123C"/>
                                             <TextBlock Text="• The Yawn-Sigh: begin a yawn (which drops the larynx) and sigh out. Notice the open, hollow space in your throat.&#x0a;• Relax your tongue and pull it slightly back. Keep your lips rounded.&#x0a;• Speak with a relaxed, slightly dropped jaw to increase the oral cavity volume." 
                                                        TextWrapping="Wrap" FontSize="12" Foreground="#E11D48" Margin="0,4,0,0"/>
                                         </StackPanel>
@@ -296,16 +340,16 @@
                         </TabItem>
 
                         <!-- WEIGHT TAB -->
-                        <TabItem Header="WEIGHT">
+                        <TabItem Header="BALANCE">
                             <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
                                 <StackPanel>
-                                    <TextBlock Text="Understanding Vocal Weight" FontFamily="Calibri" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                    <TextBlock Text="Vocal weight is the thickness and closure force of the vocal folds. Heavy weight sounds buzzy, loud, and full (masculine). Light weight sounds thin, soft, and slightly breathy/airy (feminine)." 
+                                    <TextBlock Text="Understanding Spectral Balance" FontFamily="Calibri" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <TextBlock Text="This value compares average power in the 80-250 Hz band with 250-3000 Hz. It is useful for comparing recordings made with the same microphone and distance, but it is not a direct measure of vocal-fold closure."
                                                TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,12"/>
 
                                     <Border Background="#F0F9FF" CornerRadius="8" Padding="12" Margin="0,0,0,12" BorderBrush="#BAE6FD" BorderThickness="1">
                                         <StackPanel>
-                                            <TextBlock Text="Tips to lighten Vocal Weight (Feminine)" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#0369A1"/>
+                                    <TextBlock Text="Practice a Lighter Sound" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#0369A1"/>
                                             <TextBlock Text="• Practice 'dog panting' briefly to experience open, light air flow. Transition from a pant to a soft, breathy whisper.&#x0a;• Speak with less vocal effort and smaller volume. Think of whispering with a small tone added.&#x0a;• Avoid heavy vocal fry (that creaky, buzzy low sound)." 
                                                        TextWrapping="Wrap" FontSize="12" Foreground="#0284C7" Margin="0,4,0,0"/>
                                         </StackPanel>
@@ -313,7 +357,7 @@
 
                                     <Border Background="#FFF1F2" CornerRadius="8" Padding="12" BorderBrush="#FECDD3" BorderThickness="1">
                                         <StackPanel>
-                                            <TextBlock Text="Tips to add Vocal Weight (Masculine)" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#BE123C"/>
+                                    <TextBlock Text="Practice a Fuller Sound" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#BE123C"/>
                                             <TextBlock Text="• Use a sharp glottal onset: make a clean, crisp 'ah' sound. Practice getting a firm closure of the folds.&#x0a;• Speak with confidence and chest projection. Think of pushing more air with a firmer buzz.&#x0a;• Accept moderate vocal fry, which naturally occurs in masculine low ranges." 
                                                        TextWrapping="Wrap" FontSize="12" Foreground="#E11D48" Margin="0,4,0,0"/>
                                         </StackPanel>
@@ -326,13 +370,13 @@
                         <TabItem Header="INTONATION">
                             <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
                                 <StackPanel>
-                                    <TextBlock Text="Understanding Intonation" FontFamily="Calibri" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                    <TextBlock Text="Intonation measures pitch variance. Feminine intonation is melodic, sweeping, and expressive, utilizing pitch jumps for emphasis. Masculine intonation is monotonic, delivering statements with flat pitch contours and stepping down between syllables." 
+                                    <TextBlock Text="Understanding Pitch Variation" FontFamily="Calibri" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <TextBlock Text="Intonation here is the standard deviation of tracked pitch in semitones. A larger value means a wider pitch contour in this recording; it does not determine a listener's perception of gender."
                                                TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,12"/>
 
                                     <Border Background="#F0F9FF" CornerRadius="8" Padding="12" Margin="0,0,0,12" BorderBrush="#BAE6FD" BorderThickness="1">
                                         <StackPanel>
-                                            <TextBlock Text="Tips for Melodic Intonation (Feminine)" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#0369A1"/>
+                                            <TextBlock Text="Practice Wider Pitch Variation" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#0369A1"/>
                                             <TextBlock Text="• Read aloud and exaggerate your pitch variations. Bounce up on important keywords.&#x0a;• Sweep your pitch upward at the end of sentences to convey softness or engagement.&#x0a;• Avoid a flat, uniform monotone voice." 
                                                        TextWrapping="Wrap" FontSize="12" Foreground="#0284C7" Margin="0,4,0,0"/>
                                         </StackPanel>
@@ -340,7 +384,7 @@
 
                                     <Border Background="#FFF1F2" CornerRadius="8" Padding="12" BorderBrush="#FECDD3" BorderThickness="1">
                                         <StackPanel>
-                                            <TextBlock Text="Tips for Monotonic Intonation (Masculine)" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#BE123C"/>
+                                            <TextBlock Text="Practice a Steadier Pitch" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#BE123C"/>
                                             <TextBlock Text="• Maintain a steady, narrow pitch range. Deliver phrases flatly.&#x0a;• Step down in pitch at the end of a statement to indicate finality and authority.&#x0a;• Keep a calm, steady cadence without dramatic pitches for emphasis." 
                                                        TextWrapping="Wrap" FontSize="12" Foreground="#E11D48" Margin="0,4,0,0"/>
                                         </StackPanel>
@@ -350,16 +394,16 @@
                         </TabItem>
 
                         <!-- SPEECH PATTERNS TAB -->
-                        <TabItem Header="SPEECH PATTERNS">
+                        <TabItem Header="TIMING">
                             <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
                                 <StackPanel>
-                                    <TextBlock Text="Understanding Speech Patterns" FontFamily="Calibri" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                    <TextBlock Text="Speech patterns include articulation sharpness, pausing frequency, and overall rhythm. Feminine speech is often breathier, with frequent pause phrasing and soft consonant blends. Masculine speech tends to be direct, rapid, continuous, and articulation-heavy." 
+                                    <TextBlock Text="Understanding Speech Timing" FontFamily="Calibri" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <TextBlock Text="Timing summarizes pauses, an amplitude-envelope pacing estimate, and the direction of the final half-second of voiced pitch. These measurements describe the recording; they are not used to infer gender."
                                                TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,12"/>
 
                                     <Border Background="#F0F9FF" CornerRadius="8" Padding="12" Margin="0,0,0,12" BorderBrush="#BAE6FD" BorderThickness="1">
                                         <StackPanel>
-                                            <TextBlock Text="Tips for Fluid/Breathy Patterns (Feminine)" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#0369A1"/>
+                                            <TextBlock Text="Try More Pausing" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#0369A1"/>
                                             <TextBlock Text="• Pause for breath between phrases. Let your breathing be audible and relaxed.&#x0a;• Soften hard consonants (like 'k', 't', 'p') and blend words together smoothly.&#x0a;• Practice using welcoming, open phrases with gentle starts." 
                                                        TextWrapping="Wrap" FontSize="12" Foreground="#0284C7" Margin="0,4,0,0"/>
                                         </StackPanel>
@@ -367,7 +411,7 @@
 
                                     <Border Background="#FFF1F2" CornerRadius="8" Padding="12" BorderBrush="#FECDD3" BorderThickness="1">
                                         <StackPanel>
-                                            <TextBlock Text="Tips for Direct/Staccato Patterns (Masculine)" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#BE123C"/>
+                                            <TextBlock Text="Try a More Continuous Delivery" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="#BE123C"/>
                                             <TextBlock Text="• Use sharp, crisp articulation. Enounce consonants clearly and sharply.&#x0a;• Speak in direct, complete thoughts with fewer pauses. Let the voice flow continuously.&#x0a;• End sentences with a firm, dropping tone instead of a questioning, rising curl." 
                                                        TextWrapping="Wrap" FontSize="12" Foreground="#E11D48" Margin="0,4,0,0"/>
                                         </StackPanel>
@@ -378,6 +422,7 @@
                     </TabControl>
                 </Grid>
             </Border>
+            </Grid>
         </Grid>
     </Grid>
 </UserControl>

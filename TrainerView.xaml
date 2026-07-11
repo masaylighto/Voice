@@ -42,16 +42,16 @@
                     <TextBlock Text="1. Select Vocal Metric" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,6"/>
                     <ComboBox x:Name="MetricSelector" Padding="10,6" SelectedIndex="0" SelectionChanged="MetricSelector_SelectionChanged">
                         <ComboBoxItem Content="Vocal Pitch (F0)"/>
-                        <ComboBoxItem Content="Vocal Resonance (Formants)"/>
+                        <ComboBoxItem Content="Spectral Brightness (Centroid)"/>
                     </ComboBox>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">
                     <TextBlock Text="2. Select Target Zone" FontFamily="Calibri" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,6"/>
                     <ComboBox x:Name="TargetSelector" Padding="10,6" SelectedIndex="1" SelectionChanged="TargetSelector_SelectionChanged">
-                        <ComboBoxItem Content="Masculine Zone"/>
-                        <ComboBoxItem Content="Androgynous Zone"/>
-                        <ComboBoxItem Content="Feminine Zone"/>
+                        <ComboBoxItem Content="Masculine Pitch"/>
+                        <ComboBoxItem Content="Androgynous Pitch"/>
+                        <ComboBoxItem Content="Feminine Pitch"/>
                     </ComboBox>
                 </StackPanel>
             </Grid>

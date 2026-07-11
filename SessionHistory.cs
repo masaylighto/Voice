@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Diagnostics;
 
@@ -21,12 +22,19 @@ namespace Voice
 
         // Raw Metrics
         public float AveragePitchHz { get; set; }
+        public float MedianPitchHz { get; set; }
+        public float PitchP10Hz { get; set; }
+        public float PitchP90Hz { get; set; }
+        public float PitchCoverageRatio { get; set; }
+        public float RecordingDurationSeconds { get; set; }
         public float AverageResonanceHz { get; set; }
         public float AverageWeightDb { get; set; }
         public float PitchStdDevSemitones { get; set; }
         public float PauseRatio { get; set; }
         public float ArticulationRate { get; set; }
+        public string EndingPitchDirection { get; set; } = "Not enough data";
         public string VoiceClassification { get; set; } = "Unknown";
+        public List<PitchContourPoint> PitchContour { get; set; } = new List<PitchContourPoint>();
     }
 
     public static class SessionHistory
@@ -96,12 +104,24 @@ namespace Voice
                     IntonationScore = session.IntonationScore,
                     SpeechPatternsScore = session.SpeechPatternsScore,
                     AveragePitchHz = session.AveragePitchHz,
+                    MedianPitchHz = session.MedianPitchHz,
+                    PitchP10Hz = session.PitchP10Hz,
+                    PitchP90Hz = session.PitchP90Hz,
+                    PitchCoverageRatio = session.PitchCoverageRatio,
+                    RecordingDurationSeconds = session.RecordingDurationSeconds,
                     AverageResonanceHz = session.AverageResonanceHz,
                     AverageWeightDb = session.AverageWeightDb,
                     PitchStdDevSemitones = session.PitchStdDevSemitones,
                     PauseRatio = session.PauseRatio,
                     ArticulationRate = session.ArticulationRate,
-                    VoiceClassification = session.VoiceClassification
+                    EndingPitchDirection = session.EndingPitchDirection,
+                    VoiceClassification = session.VoiceClassification,
+                    PitchContour = session.PitchContour.Select(point => new PitchContourPoint
+                    {
+                        TimeSeconds = point.TimeSeconds,
+                        PitchHz = point.PitchHz,
+                        Confidence = point.Confidence
+                    }).ToList()
                 };
 
                 var currentHistory = LoadHistory();

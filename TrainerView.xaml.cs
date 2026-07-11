@@ -59,7 +59,7 @@ namespace Voice
                         LiveValueText.Text = "--- Hz";
                     }
                 }
-                else // Resonance practice
+                else // Spectral brightness practice
                 {
                     if (metrics.Rms > 0.008f)
                     {
@@ -149,8 +149,8 @@ namespace Voice
             if (isPitch)
             {
                 if (targetZone == 0) { _targetMin = 85f; _targetMax = 130f; }
-                else if (targetZone == 1) { _targetMin = 155f; _targetMax = 185f; }
-                else { _targetMin = 190f; _targetMax = 240f; }
+                else if (targetZone == 1) { _targetMin = 145f; _targetMax = 175f; }
+                else { _targetMin = 180f; _targetMax = 255f; }
             }
             else // Resonance
             {
@@ -239,12 +239,34 @@ namespace Voice
 
         private void MetricSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            UpdateTargetSelectorLabels();
             if (this.IsLoaded) UpdateChartLayout();
         }
 
         private void TargetSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (this.IsLoaded) UpdateChartLayout();
+        }
+
+        private void UpdateTargetSelectorLabels()
+        {
+            if (TargetSelector == null)
+            {
+                return;
+            }
+
+            bool isPitch = MetricSelector.SelectedIndex == 0;
+            string[] labels = isPitch
+                ? new[] { "Masculine Pitch", "Androgynous Pitch", "Feminine Pitch" }
+                : new[] { "Lower Brightness", "Medium Brightness", "Higher Brightness" };
+
+            for (int i = 0; i < labels.Length && i < TargetSelector.Items.Count; i++)
+            {
+                if (TargetSelector.Items[i] is ComboBoxItem item)
+                {
+                    item.Content = labels[i];
+                }
+            }
         }
     }
 }
